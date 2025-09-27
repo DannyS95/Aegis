@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MessageBubble from "@/components/MessageBubble";
 import { useUser } from "@/context/UserContext";
+import ChatInput from "@/components/ChatInput"; // Adjust the path if necessary
 
 type Message = {
   id: number;
@@ -16,7 +17,6 @@ type Message = {
 
 export default function ChatWindowPage() {
   const [messages, setMessages] = useState<Message[] | null>(null); // null = loading
-  const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const { user } = useUser();
 
@@ -42,20 +42,18 @@ export default function ChatWindowPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || !user) return;
+  const handleSend = (text: string) => {
+    if (!text.trim() || !user) return;
 
     const newMessage: Message = {
       id: Date.now(),
       sender: user.name,
-      text: input,
+      text,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       status: "sent",
     };
 
     setMessages((prev) => (prev ? [...prev, newMessage] : [newMessage]));
-    setInput("");
 
     // simulate server delivery after 1s
     setTimeout(() => {
@@ -75,7 +73,7 @@ export default function ChatWindowPage() {
       );
     }, 3000);
 
-    // simulate Alice typing a reply
+    // simulate Alice typing + reply
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
@@ -148,24 +146,8 @@ export default function ChatWindowPage() {
         <div ref={bottomRef} />
       </main>
 
-      <form
-        onSubmit={handleSend}
-        className="flex border-t p-3 space-x-2"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 rounded border px-3 py-2"
-        />
-        <button
-          type="submit"
-          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-        >
-          Send
-        </button>
-      </form>
+      <ChatInput onSend={(msg) => handleSend(msg)} />
+
     </div>
   );
 }
