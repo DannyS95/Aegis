@@ -10,4 +10,5 @@ backend/dist/
 # --- Logs & Env ---
 *.log
 .env
+
 .env.*
