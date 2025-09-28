@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(uuid())
+  username      String          @unique
+  conversations Participant[]
+  messages      Message[]
+  createdAt     DateTime        @default(now())
+
+  // Implicit many-to-many: user blocking
+  blockedUsers  User[] @relation("UserBlocks")
+  blockedBy     User[] @relation("UserBlocks")
+}
+
+model Conversation {
+  id            String          @id @default(uuid())
+  participants  Participant[]
+  messages      Message[]
+  createdAt     DateTime        @default(now())
+}
+
+model Participant {
+  id             String        @id @default(uuid())
+  userId         String
+  conversationId String
+  user           User          @relation(fields: [userId], references: [id])
+  conversation   Conversation  @relation(fields: [conversationId], references: [id])
+
+  // Metadata for explicit many-to-many
+  role           String        @default("member")
+  joinedAt       DateTime      @default(now())
+  lastReadAt     DateTime?
+  muted          Boolean       @default(false)
+  banned         Boolean       @default(false)
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  content        String
+  senderId       String
+  conversationId String
+  sender         User          @relation(fields: [senderId], references: [id])
+  conversation   Conversation  @relation(fields: [conversationId], references: [id])
+  createdAt      DateTime      @default(now())
+  readAt         DateTime?
+
+  // Implicit many-to-many: emoji reactions
+  emojis Emoji[]
+}
+
+model Emoji {
+  id       String   @id @default(uuid())
+  name     String   @unique
+  messages Message[]
+}
