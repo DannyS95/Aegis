@@ -1,4 +1,4 @@
-.PHONY: up down logs build sh migrate npx restart
+.PHONY: up down logs build sh migrate npx restart generate-jwt-keys
 
 # ... your existing targets ...
 
@@ -26,13 +26,23 @@ build:
 	docker compose build $(service)
 
 restart:
-	docker compose restart $(service)
+	docker compose stop $(service)
+	docker compose up -d $(service)
+
+generate-jwt-keys:
+	bash backend/scripts/generate-jwt-keys.sh backend/.env
 
 sh:
 	docker compose exec $(service) sh
 
 migrate:
 	docker compose exec backend npx prisma migrate dev --name $(name) --schema=prisma/schema.prisma
+
+redis-exec:
+	docker compose exec redis sh -lc "$(cmd)"
+
+redis-ping:
+	docker compose exec redis sh -lc "redis-cli ping"
 
 exec:
 	docker compose exec backend $(cmd)
