@@ -17,8 +17,11 @@ export class JwtTokenService {
     payload: AccessTokenPayload,
     ttlSeconds?: number,
   ): Promise<string> {
+
     const now = Math.floor(Date.now() / 1000);
+    
     const { sub, scope, role, ...rest } = payload;
+
     const scopeClaim = scope?.length ? scope.join(' ') : undefined;
 
     const claims: Record<string, unknown> = { ...rest };
