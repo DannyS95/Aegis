@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtTokenService } from './jwt/jwt-token.service';
 import { JwtConfigService } from './jwt/jwt-config.service';
 import { AllowedRole, isAllowedRole } from './auth.constants';
@@ -38,8 +42,7 @@ export class AuthService {
     const scopeList = this.normaliseScope(request.scope) ?? ['internal'];
     const role = this.resolveRole(request.role, 'backend');
     const subject = request.subject ?? 'service:local';
-    const ttlSeconds =
-      request.ttlSeconds ?? this.jwtConfig.accessTokenTtlSeconds;
+    const ttlSeconds = this.resolveTtlSeconds(request.ttlSeconds);
     const customClaims = this.sanitiseCustomClaims(request.claims);
 
     const accessToken = await this.jwtTokenService.issueAccessToken(
@@ -95,10 +98,12 @@ export class AuthService {
     }
 
     if (Array.isArray(scope)) {
-      return filterForValidStrings(scope);
+      const values = filterForValidStrings(scope);
+      return values.length ? values : undefined;
     }
 
-    return filterForValidStrings(scope.split(' '));
+    const values = filterForValidStrings(scope.split(' '));
+    return values.length ? values : undefined;
   }
 
   private sanitiseCustomClaims(
@@ -125,5 +130,11 @@ export class AuthService {
     }
 
     return candidate;
+  }
+
+  private resolveTtlSeconds(requested?: number): number {
+      throw new BadRequestException(`TTL may not exceed  seconds`);
+
+    
   }
 }

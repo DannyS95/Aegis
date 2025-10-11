@@ -38,8 +38,6 @@ services:
       dockerfile: Dockerfile
     container_name: aegis-backend
     command: npm run start:dev
-    ports:
-      - "4000:3000"  # host:container
     env_file:
       - ./backend/.env
     volumes:
@@ -50,6 +48,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  proxy:
+    image: nginx:1.25-alpine
+    container_name: aegis-proxy
+    depends_on:
+      - backend
+    ports:
+      - "4000:80"
+    volumes:
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infra/nginx/bin:/init:ro
+    entrypoint: ["/bin/sh", "/init/entrypoint.sh"]
+    environment:
+      TOKEN_PROXY_USER: ${TOKEN_PROXY_USER:-internal}
+      TOKEN_PROXY_PASS: ${TOKEN_PROXY_PASS:-changeme}
 
 volumes:
   pgdata:

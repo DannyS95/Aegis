@@ -62,6 +62,14 @@ Helpful Nest concepts (no deep dive required):
      - Successful login issues a JWT with `sub=user:<username>`.
    - `POST /auth/token`
      - For service-to-service access.
+     - Protected behind the reverse proxy; requires Basic auth credentials.
+       - Configure via `TOKEN_PROXY_USER` / `TOKEN_PROXY_PASS` environment variables before starting Docker (defaults: `internal` / `changeme`).
+         ```bash
+         export TOKEN_PROXY_USER=internal
+         export TOKEN_PROXY_PASS='changeme'
+         docker compose up -d proxy backend
+         ```
+       - Include an `Authorization: Basic ...` header on requests to `/auth/token` using those credentials.
      - You can supply `subject`, `scope`, and `role`; otherwise the service issues a token with sensible defaults (`sub=service:local`, `scope=internal`).
 
 3. **Token structure**

@@ -8,6 +8,10 @@
 #   make npx cmd="prisma migrate dev"
 #   make npx cmd="eslint src"
 
+restart:
+	docker compose stop $(service)
+	docker compose up -d $(service)
+
 npx:
 	docker compose exec backend npx $(cmd)
 
@@ -24,10 +28,6 @@ logs:
 
 build:
 	docker compose build $(service)
-
-restart:
-	docker compose stop $(service)
-	docker compose up -d $(service)
 
 generate-jwt-keys:
 	bash backend/scripts/generate-jwt-keys.sh backend/.env
@@ -46,3 +46,13 @@ redis-ping:
 
 exec:
 	docker compose exec backend $(cmd)
+
+stack-up:
+	docker compose up -d proxy backend
+
+stack-down:
+	docker compose down proxy backend
+
+stack-restart:
+	docker compose stop proxy backend
+	docker compose up -d proxy backend
