@@ -13,11 +13,17 @@ type Message = {
   type?: "user" | "system";
   timestamp?: string;
   status?: "sent" | "delivered" | "read";
+  replyTo?: {
+    id: number;
+    sender: string;
+    text: string;
+  };
 };
 
 export default function ChatWindowPage() {
   const [messages, setMessages] = useState<Message[] | null>(null); // null = loading
   const [typing, setTyping] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const { user } = useUser();
 
   const params = useParams();
@@ -36,7 +42,18 @@ export default function ChatWindowPage() {
       setMessages([
         { id: 1, sender: "system", text: "Alice joined the chat", type: "system" },
         { id: 2, sender: "Alice", text: "Hey, are we still on for tomorrow?", timestamp: "10:30 AM" },
-        { id: 3, sender: "Danny", text: "Yep! 10am at the café.", timestamp: "10:31 AM", status: "read" },
+        {
+          id: 3,
+          sender: "Danny",
+          text: "Yep! 10am at the café.",
+          timestamp: "10:31 AM",
+          status: "read",
+          replyTo: {
+            id: 2,
+            sender: "Alice",
+            text: "Hey, are we still on for tomorrow?",
+          },
+        },
       ]);
     }, 500); // shorter delay for more natural UX
     return () => clearTimeout(timer);
@@ -45,32 +62,44 @@ export default function ChatWindowPage() {
   const handleSend = (text: string) => {
     if (!text.trim() || !user) return;
 
+    const replyContext = replyTarget
+      ? {
+          id: replyTarget.id,
+          sender: replyTarget.sender,
+          text: replyTarget.text,
+        }
+      : undefined;
+
     const newMessage: Message = {
       id: Date.now(),
       sender: user.name,
       text,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       status: "sent",
+      replyTo: replyContext,
     };
 
     setMessages((prev) => (prev ? [...prev, newMessage] : [newMessage]));
+    setReplyTarget(null);
 
     // simulate server delivery after 1s
     setTimeout(() => {
-      setMessages((prev) =>
-        prev?.map((msg) =>
+      setMessages((prev) => {
+        if (!prev) return prev;
+        return prev.map((msg) =>
           msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg
-        ) || []
-      );
+        );
+      });
     }, 1000);
 
     // simulate recipient read after 3s
     setTimeout(() => {
-      setMessages((prev) =>
-        prev?.map((msg) =>
+      setMessages((prev) => {
+        if (!prev) return prev;
+        return prev.map((msg) =>
           msg.id === newMessage.id ? { ...msg, status: "read" } : msg
-        ) || []
-      );
+        );
+      });
     }, 3000);
 
     // simulate Alice typing + reply
@@ -82,9 +111,28 @@ export default function ChatWindowPage() {
         sender: "Alice",
         text: "Sounds good 👍",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        replyTo: {
+          id: newMessage.id,
+          sender: user.name,
+          text,
+        },
       };
       setMessages((prev) => (prev ? [...prev, reply] : [reply]));
     }, 4000);
+  };
+
+  const handleReply = (message: Message) => {
+    if (message.type === "system") return;
+    setReplyTarget(message);
+  };
+
+  const handleDelete = (id: number) => {
+    setMessages((prev) => {
+      if (!prev) return prev;
+      return prev.filter((msg) => msg.id !== id);
+    });
+
+    setReplyTarget((current) => (current?.id === id ? null : current));
   };
 
   return (
@@ -124,12 +172,20 @@ export default function ChatWindowPage() {
             {messages.map((m) => (
               <MessageBubble
                 key={m.id}
+                replyTo={m.replyTo}
                 text={m.text}
                 sender={m.sender}
                 currentUser={user?.name || ""}
                 type={m.type}
                 timestamp={m.timestamp}
                 status={m.status}
+                onReply={
+                  m.type !== "system" ? () => handleReply(m) : undefined
+                }
+                onDelete={
+                  m.type !== "system" ? () => handleDelete(m.id) : undefined
+                }
+                isReplyTarget={replyTarget?.id === m.id}
               />
             ))}
 
@@ -146,7 +202,19 @@ export default function ChatWindowPage() {
         <div ref={bottomRef} />
       </main>
 
-      <ChatInput onSend={(msg) => handleSend(msg)} />
+      <ChatInput
+        onSend={(msg) => handleSend(msg)}
+        replyingTo={
+          replyTarget
+            ? {
+                id: replyTarget.id,
+                sender: replyTarget.sender,
+                text: replyTarget.text,
+              }
+            : null
+        }
+        onCancelReply={() => setReplyTarget(null)}
+      />
 
     </div>
   );
