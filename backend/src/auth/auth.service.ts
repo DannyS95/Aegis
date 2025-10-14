@@ -3,9 +3,9 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtTokenService } from './jwt/jwt-token.service';
-import { JwtConfigService } from './jwt/jwt-config.service';
 import { AllowedRole, isAllowedRole } from './auth.constants';
+import { JwtConfigService } from './jwt/services/jwt-config.service';
+import { JwtTokenService } from './jwt/services/jwt-token.service';
 import { filterForValidStrings } from '../utils/string-list.util';
 
 export interface IssueTokenRequest {
@@ -34,8 +34,8 @@ export interface LoginRequest {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly jwtTokenService: JwtTokenService,
-    private readonly jwtConfig: JwtConfigService,
+    private readonly tokenService: JwtTokenService,
+    private readonly tokenConfigService: JwtConfigService,
   ) {}
 
   async issueToken(request: IssueTokenRequest = {}): Promise<TokenResponse> {
@@ -45,7 +45,7 @@ export class AuthService {
     const ttlSeconds = this.resolveTtlSeconds(request.ttlSeconds);
     const customClaims = this.sanitiseCustomClaims(request.claims);
 
-    const accessToken = await this.jwtTokenService.issueAccessToken(
+    const accessToken = await this.tokenService.issueAccessToken(
       {
         sub: subject,
         scope: scopeList,
@@ -77,13 +77,12 @@ export class AuthService {
       }
     }
 
-    const tokenSubject = request.username
-      ? `user:${request.username}`
-      : (process.env.LOCAL_AUTH_DEFAULT_SUBJECT ?? 'service:local');
-    const role = this.resolveRole(
-      request.role,
-      request.username ? 'user' : 'backend',
-    );
+    if (!request.username) {
+      throw new UnauthorizedException('Username is required');
+    }
+
+    const tokenSubject = `user:${request.username}`;
+    const role = this.resolveRole(request.role, 'user');
 
     return this.issueToken({
       subject: tokenSubject,
@@ -133,8 +132,22 @@ export class AuthService {
   }
 
   private resolveTtlSeconds(requested?: number): number {
-      throw new BadRequestException(`TTL may not exceed  seconds`);
+    const defaultTtl = this.tokenConfigService.accessTokenTtlSeconds;
 
-    
+    if (requested === undefined) {
+      return defaultTtl;
+    }
+
+    if (!Number.isFinite(requested) || requested <= 0) {
+      throw new BadRequestException('TTL must be a positive number');
+    }
+
+    const rounded = Math.floor(requested);
+
+    if (rounded > defaultTtl) {
+      throw new BadRequestException(`TTL may not exceed ${defaultTtl} seconds`);
+    }
+
+    return rounded;
   }
 }

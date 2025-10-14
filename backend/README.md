@@ -43,7 +43,7 @@ Helpful Nest concepts (no deep dive required):
 
 - **Controllers** handle HTTP routes (e.g. `AuthController`, `UsersController`).
 - **Services** hold business logic (issued tokens, load users, etc.).
-- **Guards** run before controllers and allow/deny requests (`JwtAuthGuard`).
+- **Guards** run before controllers and allow/deny requests (for example, `JwtAuthGuard` under `auth/framework/nest/guards`).
 - **Modules** group related controllers/services and wire up dependencies.
 
 ---

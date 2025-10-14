@@ -1,4 +1,4 @@
-.PHONY: up down logs build sh migrate npx restart generate-jwt-keys
+.PHONY: up down logs build sh migrate npx generate-jwt-keys stack-up stack-down stack-restart
 
 # ... your existing targets ...
 
@@ -56,3 +56,6 @@ stack-down:
 stack-restart:
 	docker compose stop proxy backend
 	docker compose up -d proxy backend
+
+test:
+	cd backend && npm test -- --runInBand

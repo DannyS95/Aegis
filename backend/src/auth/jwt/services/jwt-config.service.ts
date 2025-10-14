@@ -4,7 +4,6 @@ import { importPKCS8, importSPKI } from 'jose';
 @Injectable()
 export class JwtConfigService {
   readonly issuer: string;
-  readonly audience: string;
   readonly accessTokenTtlSeconds: number;
   private readonly privateKeyPromise: Promise<
     Awaited<ReturnType<typeof importPKCS8>>
@@ -19,7 +18,6 @@ export class JwtConfigService {
     this.privateKeyPromise = importPKCS8(privateKeyPem, 'RS256');
     this.publicKeyPromise = importSPKI(publicKeyPem, 'RS256');
     this.issuer = process.env.JWT_ISSUER ?? 'aegis-backend';
-    this.audience = process.env.JWT_AUDIENCE ?? 'aegis-api';
     const ttl = Number(process.env.JWT_ACCESS_TOKEN_TTL ?? '3600');
 
     if (!Number.isFinite(ttl) || ttl <= 0) {

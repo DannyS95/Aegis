@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { jwtVerify } from 'jose';
-import { JwtConfigService } from './jwt-config.service';
+import { JwtConfigService } from '../../../jwt/services/jwt-config.service';
 
 export interface AuthenticatedUser {
   id: string;
@@ -29,11 +29,9 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const publicKey = await this.config.getPublicKey();
-      const verification = await jwtVerify(token, publicKey, {
+      const { payload } = await jwtVerify(token, publicKey, {
         issuer: this.config.issuer,
-        audience: this.config.audience,
       });
-      const payload = verification.payload;
 
       if (typeof payload.sub !== 'string') {
         throw new UnauthorizedException('Token subject must be a string');
@@ -51,6 +49,7 @@ export class JwtAuthGuard implements CanActivate {
           ([key]) => key !== 'sub' && key !== 'scope' && key !== 'role',
         ),
       );
+      
       request.user = {
         id: payload.sub,
         role: roleClaim,

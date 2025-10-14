@@ -3,7 +3,7 @@ import { SignJWT } from 'jose';
 import { JwtConfigService } from './jwt-config.service';
 
 export interface AccessTokenPayload {
-  sub: string;
+  sub?: string;
   scope?: string[];
   role?: string;
   [claim: string]: unknown;
@@ -17,9 +17,7 @@ export class JwtTokenService {
     payload: AccessTokenPayload,
     ttlSeconds?: number,
   ): Promise<string> {
-
     const now = Math.floor(Date.now() / 1000);
-    
     const { sub, scope, role, ...rest } = payload;
 
     const scopeClaim = scope?.length ? scope.join(' ') : undefined;
@@ -39,7 +37,6 @@ export class JwtTokenService {
       .setIssuedAt(now)
       .setNotBefore(now)
       .setIssuer(this.config.issuer)
-      .setAudience(this.config.audience)
       .setExpirationTime(
         now + (ttlSeconds ?? this.config.accessTokenTtlSeconds),
       );
