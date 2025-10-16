@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SignJWT } from 'jose';
 import { JwtConfigService } from './jwt-config.service';
 
-export interface AccessTokenPayload {
+export interface JwtTokenPayload {
   sub?: string;
   scope?: string[];
   role?: string;
@@ -13,8 +13,8 @@ export interface AccessTokenPayload {
 export class JwtTokenService {
   constructor(private readonly config: JwtConfigService) {}
 
-  async issueAccessToken(
-    payload: AccessTokenPayload,
+  async signAccessToken(
+    payload: JwtTokenPayload,
     ttlSeconds?: number,
   ): Promise<string> {
     const now = Math.floor(Date.now() / 1000);

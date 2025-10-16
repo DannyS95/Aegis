@@ -25,8 +25,8 @@ describe('JwtTokenService', () => {
     service = new JwtTokenService(config);
   });
 
-  it('proves JWT issuance includes subject, scope, role, and custom claims', async () => {
-    const token = await service.issueAccessToken(
+  it('signs tokens that include subject, scope, role, and custom claims', async () => {
+    const token = await service.signAccessToken(
       {
         sub: 'user:42',
         scope: ['read', 'write'],
@@ -49,8 +49,8 @@ describe('JwtTokenService', () => {
     ).toBe(1200);
   });
 
-  it('proves JWT issuance omits absent optional claims and falls back to default ttl', async () => {
-    const token = await service.issueAccessToken({ feature: 'beta' });
+  it('omits absent optional claims and falls back to the configured TTL', async () => {
+    const token = await service.signAccessToken({ feature: 'beta' });
     const verification = await jwtVerify(token, publicKey, {
       issuer,
     });

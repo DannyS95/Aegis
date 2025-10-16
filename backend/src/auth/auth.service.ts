@@ -3,7 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { AllowedRole, isAllowedRole } from './auth.constants';
+import { AllowedRole, isAllowedRole } from './constants/auth.constants';
 import { JwtConfigService } from './jwt/services/jwt-config.service';
 import { JwtTokenService } from './jwt/services/jwt-token.service';
 import { filterForValidStrings } from '../utils/string-list.util';
@@ -45,7 +45,7 @@ export class AuthService {
     const ttlSeconds = this.resolveTtlSeconds(request.ttlSeconds);
     const customClaims = this.sanitiseCustomClaims(request.claims);
 
-    const accessToken = await this.tokenService.issueAccessToken(
+    const accessToken = await this.tokenService.signAccessToken(
       {
         sub: subject,
         scope: scopeList,

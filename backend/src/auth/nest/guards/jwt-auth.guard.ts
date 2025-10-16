@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { jwtVerify } from 'jose';
-import { JwtConfigService } from '../../../jwt/services/jwt-config.service';
+import { JwtConfigService } from '../../jwt/services/jwt-config.service';
 
 export interface AuthenticatedUser {
   id: string;
@@ -49,7 +49,7 @@ export class JwtAuthGuard implements CanActivate {
           ([key]) => key !== 'sub' && key !== 'scope' && key !== 'role',
         ),
       );
-      
+
       request.user = {
         id: payload.sub,
         role: roleClaim,
