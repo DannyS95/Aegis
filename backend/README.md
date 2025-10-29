@@ -17,6 +17,8 @@ Welcome to the NestJS service that powers the Aegis chat system. Even if you hav
    make generate-jwt-keys   # create RSA keys and store them in .env
    make stack-up            # start nginx proxy + backend + Postgres + Redis
    make generate            # generate Prisma client inside the container
+   make migrate-deploy      # apply pending Prisma migrations
+   make seed                # populate dev users (alice, bob, charlie)
    make up service=adminer  # (optional) launch Adminer at http://localhost:8080
    make logs                # tail backend logs (Ctrl+C to stop)
    ```
@@ -74,9 +76,9 @@ Helpful Nest concepts (no deep dive required):
 
 2. **Issuing tokens**
    - `POST /auth/login`
-     - Sends `{ "username": "...", "password": "..." }`.
-     - Credentials are required only if `LOCAL_AUTH_USERNAME` / `LOCAL_AUTH_PASSWORD` are set in `.env` (defaults in the sample file).
-     - Successful login issues a JWT with `sub=user:<username>`.
+     - Sends `{ "username": "alice" }` or `{ "email": "alice@example.com" }`.
+     - Users must exist in Postgres (seeded via `make seed`).
+     - Successful login issues a JWT with `sub=<user.id>` and includes username/email in the claims.
    - `POST /auth/token`
      - For service-to-service access.
      - Protected behind the reverse proxy; requires Basic auth credentials.
@@ -98,7 +100,7 @@ Helpful Nest concepts (no deep dive required):
    ```bash
    TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
      -H 'Content-Type: application/json' \
-     -d '{"username":"admin","password":"change-me"}' \
+     -d '{"username":"alice"}' \
      | jq -r '.accessToken')
 
    curl http://localhost:4000/users/me \
@@ -120,6 +122,8 @@ Helpful Nest concepts (no deep dive required):
 | `make exec cmd="bash"` | Open a shell inside the backend container |
 | `make migrate name=create_users` | Run `prisma migrate dev` inside Docker |
 | `make generate` | Run `prisma generate` inside the backend container |
+| `make migrate-deploy` | Apply all pending migrations in the current database |
+| `make seed` | Run `prisma db seed` to populate dev users |
 | `make generate-jwt-keys` | Generate RSA keys and update `.env` |
 
 Behind the scenes the backend container runs `npm run start:dev`, so code changes refresh automatically.
@@ -132,6 +136,7 @@ Behind the scenes the backend container runs `npm run start:dev`, so code change
 | --- | --- |
 | `PORT` | Nest listen port inside the container (`3000` default) |
 | `NODE_ENV` | Runtime mode (`development`, `production`, `test`) |
+| `FRONTEND_ORIGIN` | Allowed origin for browser requests (defaults to `http://localhost:3000`) |
 | `DATABASE_URL` | Postgres connection string for Prisma |
 | `REDIS_URL` | Redis connection URI |
 | `JWT_ISSUER` | `iss` claim for new tokens |
@@ -139,9 +144,6 @@ Behind the scenes the backend container runs `npm run start:dev`, so code change
 | `JWT_ACCESS_TOKEN_TTL` | Token lifetime in seconds |
 | `JWT_PRIVATE_KEY` | RSA private key (escaped PEM) |
 | `JWT_PUBLIC_KEY` | RSA public key (escaped PEM) |
-| `LOCAL_AUTH_USERNAME` | Optional username gate for `/auth/login` |
-| `LOCAL_AUTH_PASSWORD` | Optional password gate for `/auth/login` |
-| `LOCAL_AUTH_DEFAULT_SUBJECT` | Fallback subject when issuing service tokens |
 
 You can regenerate keys anytime with `make generate-jwt-keys`; just remember to restart the backend afterwards.
 

@@ -7,6 +7,7 @@ import { AllowedRole, isAllowedRole } from './constants/auth.constants';
 import { JwtConfigService } from './jwt/services/jwt-config.service';
 import { JwtTokenService } from './jwt/services/jwt-token.service';
 import { filterForValidStrings } from '../utils/string-list.util';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface IssueTokenRequest {
   subject?: string;
@@ -26,6 +27,7 @@ export interface TokenResponse {
 
 export interface LoginRequest {
   username?: string;
+  email?: string;
   password?: string;
   scope?: string | string[];
   role?: AllowedRole;
@@ -36,6 +38,7 @@ export class AuthService {
   constructor(
     private readonly tokenService: JwtTokenService,
     private readonly tokenConfigService: JwtConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async issueToken(request: IssueTokenRequest = {}): Promise<TokenResponse> {
@@ -65,29 +68,36 @@ export class AuthService {
   }
 
   async login(request: LoginRequest = {}): Promise<TokenResponse> {
-    const expectedUsername = process.env.LOCAL_AUTH_USERNAME;
-    const expectedPassword = process.env.LOCAL_AUTH_PASSWORD;
+    const { username, email } = this.resolveLoginIdentity(
+      request.username,
+      request.email,
+    );
 
-    if (expectedUsername && expectedPassword) {
-      if (
-        request.username !== expectedUsername ||
-        request.password !== expectedPassword
-      ) {
-        throw new UnauthorizedException('Invalid credentials');
-      }
+    const where =
+      username && email
+        ? { OR: [{ username }, { email }] }
+        : username
+          ? { username }
+          : { email: email! };
+
+    const user = await this.prisma.user.findFirst({ where });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!request.username) {
-      throw new UnauthorizedException('Username is required');
-    }
-
-    const tokenSubject = `user:${request.username}`;
+    const tokenSubject = user.id;
     const role = this.resolveRole(request.role, 'user');
 
     return this.issueToken({
       subject: tokenSubject,
       scope: request.scope,
       role,
+      claims: {
+        username: user.username,
+        email: user.email,
+        ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+      },
     });
   }
 
@@ -103,6 +113,25 @@ export class AuthService {
 
     const values = filterForValidStrings(scope.split(' '));
     return values.length ? values : undefined;
+  }
+
+  private resolveLoginIdentity(
+    username?: string,
+    email?: string,
+  ): { username?: string; email?: string } {
+    const normalisedUsername = username?.trim();
+    const normalisedEmail = email?.trim().toLowerCase();
+
+    if (!normalisedUsername && !normalisedEmail) {
+      throw new UnauthorizedException(
+        'Either username or email is required to login',
+      );
+    }
+
+    return {
+      username: normalisedUsername || undefined,
+      email: normalisedEmail || undefined,
+    };
   }
 
   private sanitiseCustomClaims(

@@ -33,18 +33,28 @@ export default function ChatWindowPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (!user) {
+      router.replace("/login");
+    }
+  }, [user, router]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
   // simulate loading messages
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       setMessages([
         { id: 1, sender: "system", text: "Alice joined the chat", type: "system" },
         { id: 2, sender: "Alice", text: "Hey, are we still on for tomorrow?", timestamp: "10:30 AM" },
         {
           id: 3,
-          sender: "Danny",
+          sender: user.username,
           text: "Yep! 10am at the café.",
           timestamp: "10:31 AM",
           status: "read",
@@ -57,7 +67,7 @@ export default function ChatWindowPage() {
       ]);
     }, 500); // shorter delay for more natural UX
     return () => clearTimeout(timer);
-  }, []);
+  }, [user]);
 
   const handleSend = (text: string) => {
     if (!text.trim() || !user) return;
@@ -72,7 +82,7 @@ export default function ChatWindowPage() {
 
     const newMessage: Message = {
       id: Date.now(),
-      sender: user.name,
+      sender: user.username,
       text,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       status: "sent",
@@ -113,7 +123,7 @@ export default function ChatWindowPage() {
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         replyTo: {
           id: newMessage.id,
-          sender: user.name,
+          sender: user.username,
           text,
         },
       };
@@ -175,7 +185,7 @@ export default function ChatWindowPage() {
                 replyTo={m.replyTo}
                 text={m.text}
                 sender={m.sender}
-                currentUser={user?.name || ""}
+                currentUser={user?.username ?? user?.email ?? ""}
                 type={m.type}
                 timestamp={m.timestamp}
                 status={m.status}

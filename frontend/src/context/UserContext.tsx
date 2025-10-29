@@ -1,27 +1,55 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  ReactNode,
+} from "react";
 
-type User = {
-  id: number;
-  name: string;
+export type User = {
+  id: string;
+  username: string;
+  email: string;
+  avatarUrl?: string | null;
 };
 
 type UserContextType = {
   user: User | null;
-  setUser: (user: User | null) => void;
+  token: string | null;
+  setAuthState: (user: User | null, token: string | null) => void;
+  clearAuthState: () => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>({ id: 1, name: "Danny" }); // mock user
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
-  return (
-    <UserContext.Provider value={{ user, setUser }}>
-      {children}
-    </UserContext.Provider>
+  const setAuthState = useCallback((nextUser: User | null, nextToken: string | null) => {
+    setUser(nextUser);
+    setToken(nextToken);
+  }, []);
+
+  const clearAuthState = useCallback(() => {
+    setUser(null);
+    setToken(null);
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      setAuthState,
+      clearAuthState,
+    }),
+    [user, token, setAuthState, clearAuthState],
   );
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
 export function useUser() {

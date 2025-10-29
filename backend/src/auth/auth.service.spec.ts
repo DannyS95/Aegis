@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService, TokenResponse, IssueTokenRequest } from './auth.service';
 import { JwtTokenService, JwtTokenPayload } from './jwt/services/jwt-token.service';
 import { JwtConfigService } from './jwt/services/jwt-config.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('AuthService', () => {
   const defaultTtl = 3600;
@@ -11,6 +12,11 @@ describe('AuthService', () => {
     signAccessToken: jest.fn(),
   } as unknown as JwtTokenService;
   const jwtConfigService = {} as JwtConfigService;
+  const prismaService = {
+    user: {
+      findFirst: jest.fn(),
+    },
+  } as unknown as PrismaService;
   let service: AuthService;
   const ORIGINAL_ENV = process.env;
 
@@ -35,6 +41,10 @@ describe('AuthService', () => {
         {
           provide: JwtConfigService,
           useValue: jwtConfigService,
+        },
+        {
+          provide: PrismaService,
+          useValue: prismaService,
         },
       ],
     }).compile();
@@ -158,49 +168,77 @@ describe('AuthService', () => {
 
     beforeEach(() => {
       jest.spyOn(service, 'issueToken').mockResolvedValue(tokenResponse);
+      (prismaService.user.findFirst as jest.Mock).mockReset();
     });
 
     afterEach(() => {
       (service.issueToken as jest.Mock).mockRestore();
-      delete process.env.LOCAL_AUTH_USERNAME;
-      delete process.env.LOCAL_AUTH_PASSWORD;
-      delete process.env.LOCAL_AUTH_DEFAULT_SUBJECT;
     });
 
-    it('proves login rejects mismatched configured credentials', async () => {
-      process.env.LOCAL_AUTH_USERNAME = 'user';
-      process.env.LOCAL_AUTH_PASSWORD = 'secret';
+    it('requires either username or email', async () => {
+      await expect(service.login({})).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(prismaService.user.findFirst).not.toHaveBeenCalled();
+      expect(service.issueToken).not.toHaveBeenCalled();
+    });
+
+    it('rejects when no matching user is found', async () => {
+      (prismaService.user.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        service.login({ username: 'user', password: 'wrong' }),
+        service.login({ username: 'missing-user' }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
       expect(service.issueToken).not.toHaveBeenCalled();
     });
 
-    it('proves login derives subject and applies allowed role when username provided', async () => {
-      process.env.LOCAL_AUTH_USERNAME = 'admin';
-      process.env.LOCAL_AUTH_PASSWORD = 'change-me';
-      (service.issueToken as jest.Mock).mockResolvedValue({
-        ...tokenResponse,
-        role: 'user',
-      });
+    it('issues a token using the located users identifier', async () => {
+      const user = {
+        id: 'user-123',
+        username: 'alice',
+        email: 'alice@example.com',
+        avatarUrl: 'https://example.com/alice.png',
+      };
+      (prismaService.user.findFirst as jest.Mock).mockResolvedValue(user);
 
-      await service.login({
-        username: 'admin',
-        password: 'change-me',
-      });
+      await service.login({ username: 'alice' });
 
+      expect(prismaService.user.findFirst).toHaveBeenCalledWith({
+        where: { username: 'alice' },
+      });
       expect(service.issueToken).toHaveBeenCalledWith({
-        subject: 'user:admin',
+        subject: user.id,
         role: 'user',
+        claims: {
+          username: user.username,
+          email: user.email,
+          avatarUrl: user.avatarUrl,
+        },
       });
     });
 
-    it('proves login rejects requests without a username', async () => {
-      await expect(service.login({})).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
-      expect(service.issueToken).not.toHaveBeenCalled();
+    it('supports logging in with an email address', async () => {
+      const user = {
+        id: 'user-456',
+        username: 'bob',
+        email: 'bob@example.com',
+        avatarUrl: null,
+      };
+      (prismaService.user.findFirst as jest.Mock).mockResolvedValue(user);
+
+      await service.login({ email: 'bob@example.com' });
+
+      expect(prismaService.user.findFirst).toHaveBeenCalledWith({
+        where: { email: 'bob@example.com' },
+      });
+      expect(service.issueToken).toHaveBeenCalledWith({
+        subject: user.id,
+        role: 'user',
+        claims: {
+          username: user.username,
+          email: user.email,
+        },
+      });
     });
   });
 });
