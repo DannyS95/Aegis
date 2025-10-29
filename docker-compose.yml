@@ -64,6 +64,17 @@ services:
       TOKEN_PROXY_USER: ${TOKEN_PROXY_USER:-internal}
       TOKEN_PROXY_PASS: ${TOKEN_PROXY_PASS:-changeme}
 
+  adminer:
+    image: adminer:4
+    container_name: aegis-adminer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "8080:8080"
+
 volumes:
   pgdata:
   redisdata:

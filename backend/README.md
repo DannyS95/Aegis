@@ -15,8 +15,13 @@ Welcome to the NestJS service that powers the Aegis chat system. Even if you hav
    ```bash
    cp backend/.env.example backend/.env
    make generate-jwt-keys   # create RSA keys and store them in .env
-   make up                  # start backend + Postgres + Redis
+   make stack-up            # start nginx proxy + backend + Postgres + Redis
+   make generate            # generate Prisma client inside the container
+   make up service=adminer  # (optional) launch Adminer at http://localhost:8080
+   make logs                # tail backend logs (Ctrl+C to stop)
    ```
+
+   > Adminer connects to the same Postgres instance (default credentials `aegis` / `aegis`). Start it only when you need a browser UI on http://localhost:8080.
 
 3. **Verify the API is up**
    - Backend listens inside Docker on port `3000`
@@ -25,8 +30,20 @@ Welcome to the NestJS service that powers the Aegis chat system. Even if you hav
 
 4. **Tear down when finished**
    ```bash
-   make down
+   make stack-down
    ```
+
+> **Heads up:** `make stack-up` ensures the nginx proxy runs. If you only run `make up`, the backend listens on port 3000 but `http://localhost:4000` (through nginx) will fail.
+
+### If something looks stuck
+
+When the proxy or Prisma client gets out of sync (e.g. login stops working), recycle the stack and regenerate the client:
+```bash
+make stack-down
+make stack-up
+make generate
+```
+Give Nest a few seconds to boot, then retry your request.
 
 ---
 
@@ -94,12 +111,15 @@ Helpful Nest concepts (no deep dive required):
 
 | Command | Purpose |
 | --- | --- |
-| `make up` | Start backend + Postgres + Redis in detached mode |
-| `make down` | Stop the stack |
-| `make restart` | Stop + start the selected service (defaults to backend) |
+| `make stack-up` | Start nginx proxy + backend (Postgres/Redis start via dependencies) |
+| `make stack-down` | Stop nginx proxy + backend (and the dependent services) |
+| `make up` | Start only the selected service (defaults to backend) |
+| `make down` | Stop only the selected service |
+| `make restart` | Restart the selected service (defaults to backend) |
 | `make logs service=backend` | Stream Docker logs for a service |
 | `make exec cmd="bash"` | Open a shell inside the backend container |
 | `make migrate name=create_users` | Run `prisma migrate dev` inside Docker |
+| `make generate` | Run `prisma generate` inside the backend container |
 | `make generate-jwt-keys` | Generate RSA keys and update `.env` |
 
 Behind the scenes the backend container runs `npm run start:dev`, so code changes refresh automatically.

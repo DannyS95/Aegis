@@ -1,4 +1,4 @@
-.PHONY: up down logs build sh migrate npx generate-jwt-keys stack-up stack-down stack-restart
+.PHONY: up down logs build sh migrate npx generate-jwt-keys stack-up stack-down stack-restart generate
 
 # ... your existing targets ...
 
@@ -37,6 +37,9 @@ sh:
 
 migrate:
 	docker compose exec backend npx prisma migrate dev --name $(name) --schema=prisma/schema.prisma
+
+generate:
+	docker compose exec backend npx prisma generate --schema=prisma/schema.prisma
 
 redis-exec:
 	docker compose exec redis sh -lc "$(cmd)"
