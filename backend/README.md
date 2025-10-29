@@ -76,6 +76,17 @@ We follow a light Domain-Driven Design approach so each bounded context owns its
 
 Shared infrastructure (Prisma, Redis, HTTP) lives in their own layers so contexts stay decoupled.
 
+### How we build and evolve APIs here
+
+1. **Identify the bounded context.** New behaviour lives inside the domain that owns it (for example, token issuance stays in `auth/`, user read models stay in `users/`). Cross-cutting concerns belong in `security/` or shared utilities.
+2. **Model the module.** Each context exposes a Nest module (`*.module.ts`) that assembles its controllers, services, and any Prisma dependencies. Modules are the only units other contexts import.
+3. **Design the contract.** Controllers define HTTP routes and simple DTOs, delegating to services for real work. Services encapsulate business rules and talk to Prisma or other providers injected via Nest.
+4. **Secure first.** Guards from `security/guards` sit in front of controllers to enforce authentication/authorization. They rely on shared providers like `JwtKeyProvider` so every route validates tokens consistently.
+5. **Keep concerns isolated.** When a feature spans contexts (e.g. auth issuing tokens for users), communicate through injected services rather than reaching into another context’s files.
+6. **Document and test.** Update this README when architecture changes, and add focused unit tests alongside the controller/service being touched.
+
+Following this flow keeps the codebase aligned with our DDD-lite structure while making it obvious where new APIs should live and how they should be wired.
+
 ---
 
 ## 3. How Authentication Works
