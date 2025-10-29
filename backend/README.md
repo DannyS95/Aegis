@@ -53,17 +53,28 @@ Give Nest a few seconds to boot, then retry your request.
 
 | Piece | Description | Where |
 | --- | --- | --- |
-| NestJS app | HTTP controllers + guards + dependency injection | `backend/src` |
+| NestJS app | HTTP controllers + dependency injection | `backend/src` |
+| Security | Cross-cutting guards + JWT key material | `backend/src/security` |
+| Auth | Token issuance & domain policies | `backend/src/auth` |
 | Prisma | Type-safe database access for Postgres | `backend/prisma` |
 | Redis | Caching/ephemeral state (ready for chat features) | Docker service |
-| Auth | Locally signed RSA JWTs (no external provider) | `backend/src/auth` |
 
 Helpful Nest concepts (no deep dive required):
 
 - **Controllers** handle HTTP routes (e.g. `AuthController`, `UsersController`).
 - **Services** hold business logic (issued tokens, load users, etc.).
-- **Guards** run before controllers and allow/deny requests (for example, `JwtAuthGuard` under `auth/framework/nest/guards`).
+- **Guards** run before controllers and allow/deny requests (for example, `JwtAuthGuard` under `security/guards`).
 - **Modules** group related controllers/services and wire up dependencies.
+
+### Architectural boundaries
+
+We follow a light Domain-Driven Design approach so each bounded context owns its concerns:
+
+- **Security context** encapsulates cross-cutting concerns (JWT key management and request guards).
+- **Auth context** focuses on issuing tokens for trusted actors.
+- **Users context** handles profile lookup and domain data access.
+
+Shared infrastructure (Prisma, Redis, HTTP) lives in their own layers so contexts stay decoupled.
 
 ---
 
@@ -72,6 +83,7 @@ Helpful Nest concepts (no deep dive required):
 1. **Key material**
    - `make generate-jwt-keys` uses OpenSSL to generate an RSA keypair.
    - Keys are written into `.env` as escaped strings (`JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`).
+   - `JwtKeyProvider` (in `security/jwt`) loads the PEMs once at boot so both token issuance and guards reuse the same material.
    - `make restart` reloads the environment so Nest picks up the new values.
 
 2. **Issuing tokens**

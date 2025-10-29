@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SignJWT } from 'jose';
-import { JwtConfigService } from './jwt-config.service';
+import { JwtKeyProvider } from './jwt-key.provider';
 
 export interface JwtTokenPayload {
   sub?: string;
@@ -11,7 +11,7 @@ export interface JwtTokenPayload {
 
 @Injectable()
 export class JwtTokenService {
-  constructor(private readonly config: JwtConfigService) {}
+  constructor(private readonly config: JwtKeyProvider) {}
 
   async signAccessToken(
     payload: JwtTokenPayload,

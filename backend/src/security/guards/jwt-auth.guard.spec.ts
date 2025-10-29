@@ -1,7 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { generateKeyPair, SignJWT } from 'jose';
 import { JwtAuthGuard, AuthenticatedRequest } from './jwt-auth.guard';
-import { JwtConfigService } from '../../jwt/services/jwt-config.service';
+import { JwtKeyProvider } from '../jwt/jwt-key.provider';
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
@@ -9,7 +9,6 @@ describe('JwtAuthGuard', () => {
   let privateKey: KeyPair['privateKey'];
   let publicKey: KeyPair['publicKey'];
   const issuer = 'test-issuer';
-  const audience = 'test-audience';
 
   const createContext = (request: Partial<AuthenticatedRequest>) =>
     ({
@@ -25,9 +24,9 @@ describe('JwtAuthGuard', () => {
 
     const config = {
       issuer,
-      audience,
+      accessTokenTtlSeconds: 3600,
       getPublicKey: jest.fn(async () => publicKey),
-    } as unknown as JwtConfigService;
+    } as unknown as JwtKeyProvider;
 
     guard = new JwtAuthGuard(config);
   });
@@ -36,7 +35,6 @@ describe('JwtAuthGuard', () => {
     new SignJWT(payload)
       .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
       .setIssuer(issuer)
-      .setAudience(audience)
       .setSubject('user:123')
       .setIssuedAt()
       .setExpirationTime('1h')

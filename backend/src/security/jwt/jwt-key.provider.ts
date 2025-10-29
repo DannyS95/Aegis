@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { importPKCS8, importSPKI } from 'jose';
 
 @Injectable()
-export class JwtConfigService {
+export class JwtKeyProvider {
   readonly issuer: string;
   readonly accessTokenTtlSeconds: number;
   private readonly privateKeyPromise: Promise<

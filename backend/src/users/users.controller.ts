@@ -5,9 +5,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { JwtAuthGuard } from '../auth/nest/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../security/guards/jwt-auth.guard';
 import { CurrentUser } from './nest/current-user.decorator';
-import type { AuthenticatedUser } from '../auth/nest/guards/jwt-auth.guard';
+import type { AuthenticatedUser } from '../security/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')

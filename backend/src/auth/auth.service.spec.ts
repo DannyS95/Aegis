@@ -1,8 +1,8 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService, TokenResponse, IssueTokenRequest } from './auth.service';
-import { JwtTokenService, JwtTokenPayload } from './jwt/services/jwt-token.service';
-import { JwtConfigService } from './jwt/services/jwt-config.service';
+import { JwtTokenService, JwtTokenPayload } from '../security/jwt/jwt-token.service';
+import { JwtKeyProvider } from '../security/jwt/jwt-key.provider';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('AuthService', () => {
@@ -11,7 +11,7 @@ describe('AuthService', () => {
   const jwtTokenService = {
     signAccessToken: jest.fn(),
   } as unknown as JwtTokenService;
-  const jwtConfigService = {} as JwtConfigService;
+  const jwtKeyProvider = {} as JwtKeyProvider;
   const prismaService = {
     user: {
       findFirst: jest.fn(),
@@ -24,7 +24,7 @@ describe('AuthService', () => {
     jest.clearAllMocks();
     process.env = { ...ORIGINAL_ENV };
 
-    Object.defineProperty(jwtConfigService, 'accessTokenTtlSeconds', {
+    Object.defineProperty(jwtKeyProvider, 'accessTokenTtlSeconds', {
       configurable: true,
       enumerable: true,
       writable: true,
@@ -39,8 +39,8 @@ describe('AuthService', () => {
           useValue: jwtTokenService,
         },
         {
-          provide: JwtConfigService,
-          useValue: jwtConfigService,
+          provide: JwtKeyProvider,
+          useValue: jwtKeyProvider,
         },
         {
           provide: PrismaService,

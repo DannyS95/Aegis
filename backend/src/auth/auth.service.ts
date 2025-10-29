@@ -4,8 +4,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AllowedRole, isAllowedRole } from './constants/auth.constants';
-import { JwtConfigService } from './jwt/services/jwt-config.service';
-import { JwtTokenService } from './jwt/services/jwt-token.service';
+import { JwtKeyProvider } from '../security/jwt/jwt-key.provider';
+import { JwtTokenService } from '../security/jwt/jwt-token.service';
 import { filterForValidStrings } from '../utils/string-list.util';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -37,7 +37,7 @@ export interface LoginRequest {
 export class AuthService {
   constructor(
     private readonly tokenService: JwtTokenService,
-    private readonly tokenConfigService: JwtConfigService,
+    private readonly tokenConfigService: JwtKeyProvider,
     private readonly prisma: PrismaService,
   ) {}
 

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { jwtVerify } from 'jose';
-import { JwtConfigService } from '../../jwt/services/jwt-config.service';
+import { JwtKeyProvider } from '../jwt/jwt-key.provider';
 
 export interface AuthenticatedUser {
   id: string;
@@ -21,7 +21,7 @@ export interface AuthenticatedRequest extends Request {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly config: JwtConfigService) {}
+  constructor(private readonly config: JwtKeyProvider) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();

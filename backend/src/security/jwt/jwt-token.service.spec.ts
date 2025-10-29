@@ -1,6 +1,6 @@
 import { generateKeyPair, jwtVerify } from 'jose';
 import { JwtTokenService } from './jwt-token.service';
-import { JwtConfigService } from './jwt-config.service';
+import { JwtKeyProvider } from './jwt-key.provider';
 
 describe('JwtTokenService', () => {
   let service: JwtTokenService;
@@ -20,7 +20,7 @@ describe('JwtTokenService', () => {
       accessTokenTtlSeconds: defaultTtl,
       getPrivateKey: jest.fn(async () => privateKey),
       getPublicKey: jest.fn(async () => publicKey),
-    } as unknown as JwtConfigService;
+    } as unknown as JwtKeyProvider;
 
     service = new JwtTokenService(config);
   });
