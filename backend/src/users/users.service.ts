@@ -11,4 +11,33 @@ export class UsersService {
       where: { id },
     });
   }
+
+  async findManyByIds(ids: string[]) {
+    if (!ids.length) {
+      return [];
+    }
+
+    return this.prisma.user.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+    });
+  }
+
+  async listAll() {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        avatarUrl: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
 }

@@ -1,4 +1,4 @@
-.PHONY: up down logs build sh migrate migrate-deploy npx generate-jwt-keys stack-up stack-down stack-restart generate seed
+.PHONY: up down logs build sh migrate migrate-deploy npx generate-jwt-keys stack-up stack-down stack-restart generate seed start-debug
 
 # ... your existing targets ...
 
@@ -39,13 +39,16 @@ migrate:
 	docker compose exec backend npx prisma migrate dev --name $(name) --schema=prisma/schema.prisma
 
 generate:
-	docker compose exec backend npx prisma generate --schema=prisma/schema.prisma
+	docker compose run --rm backend sh -lc "npx prisma generate --schema=prisma/schema.prisma"
 
 migrate-deploy:
 	docker compose exec backend npx prisma migrate deploy --schema=prisma/schema.prisma
 
 seed:
 	docker compose exec backend npm run seed
+
+start-debug:
+	docker compose exec backend sh -lc "npx prisma generate && npm run build && PORT=4000 node --inspect=0.0.0.0:9229 dist/main.js"
 
 redis-exec:
 	docker compose exec redis sh -lc "$(cmd)"

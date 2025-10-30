@@ -12,6 +12,7 @@ model User {
   username      String          @unique
   email         String          @unique
   avatarUrl     String?
+  role          String          @default("user")
   conversations Participant[]
   messages      Message[]
   createdAt     DateTime        @default(now())
@@ -23,9 +24,13 @@ model User {
 
 model Conversation {
   id            String          @id @default(uuid())
+  title         String?
+  isGroup       Boolean         @default(false)
+  lastMessageId String?
   participants  Participant[]
   messages      Message[]
   createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model Participant {
@@ -41,6 +46,8 @@ model Participant {
   lastReadAt     DateTime?
   muted          Boolean       @default(false)
   banned         Boolean       @default(false)
+
+  @@unique([conversationId, userId])
 }
 
 model Message {
@@ -55,6 +62,8 @@ model Message {
 
   // Implicit many-to-many: emoji reactions
   emojis Emoji[]
+
+  @@index([conversationId, createdAt(sort: Desc)])
 }
 
 model Emoji {

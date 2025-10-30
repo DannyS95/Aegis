@@ -152,7 +152,7 @@ describe('AuthService', () => {
 
     it('rejects roles outside the allowlist', async () => {
       await expect(
-        service.issueToken({ role: 'admin' as never }),
+        service.issueToken({ role: 'super-admin' as never }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
   });
@@ -198,6 +198,7 @@ describe('AuthService', () => {
         username: 'alice',
         email: 'alice@example.com',
         avatarUrl: 'https://example.com/alice.png',
+        role: 'user',
       };
       (prismaService.user.findFirst as jest.Mock).mockResolvedValue(user);
 
@@ -223,6 +224,7 @@ describe('AuthService', () => {
         username: 'bob',
         email: 'bob@example.com',
         avatarUrl: null,
+        role: 'user',
       };
       (prismaService.user.findFirst as jest.Mock).mockResolvedValue(user);
 
@@ -234,6 +236,28 @@ describe('AuthService', () => {
       expect(service.issueToken).toHaveBeenCalledWith({
         subject: user.id,
         role: 'user',
+        claims: {
+          username: user.username,
+          email: user.email,
+        },
+      });
+    });
+
+    it('honours the stored user role when issuing tokens', async () => {
+      const user = {
+        id: 'admin-1',
+        username: 'admin',
+        email: 'admin@example.com',
+        avatarUrl: null,
+        role: 'admin',
+      };
+      (prismaService.user.findFirst as jest.Mock).mockResolvedValue(user);
+
+      await service.login({ username: 'admin' });
+
+      expect(service.issueToken).toHaveBeenCalledWith({
+        subject: user.id,
+        role: 'admin',
         claims: {
           username: user.username,
           email: user.email,

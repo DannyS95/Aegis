@@ -19,11 +19,20 @@ Welcome to the NestJS service that powers the Aegis chat system. Even if you hav
    make generate            # generate Prisma client inside the container
    make migrate-deploy      # apply pending Prisma migrations
    make seed                # populate dev users (alice, bob, charlie)
+                            # plus an admin super-user (admin@…)
    make up service=adminer  # (optional) launch Adminer at http://localhost:8080
    make logs                # tail backend logs (Ctrl+C to stop)
    ```
 
    > Adminer connects to the same Postgres instance (default credentials `aegis` / `aegis`). Start it only when you need a browser UI on http://localhost:8080.
+
+   > **Tip:** After schema changes run `make generate` and restart your TypeScript server/IDE so the new Prisma types are picked up. If hints still look stale, remove `backend/node_modules/.prisma`, reinstall, then generate again.
+
+   Seeded accounts via `make seed`:
+   - `alice@example.com` (username `alice`, role `user`)
+   - `bob@example.com` (username `bob`, role `user`)
+   - `charlie@example.com` (username `charlie`, role `user`)
+   - `admin@example.com` (username `admin`, role `admin`)
 
 3. **Verify the API is up**
    - Backend listens inside Docker on port `3000`
@@ -56,6 +65,7 @@ Give Nest a few seconds to boot, then retry your request.
 | NestJS app | HTTP controllers + dependency injection | `backend/src` |
 | Security | Cross-cutting guards + JWT key material | `backend/src/security` |
 | Auth | Token issuance & domain policies | `backend/src/auth` |
+| Conversations | REST APIs for conversation lifecycle | `backend/src/conversations` |
 | Prisma | Type-safe database access for Postgres | `backend/prisma` |
 | Redis | Caching/ephemeral state (ready for chat features) | Docker service |
 
@@ -185,7 +195,35 @@ You can regenerate keys anytime with `make generate-jwt-keys`; just remember to 
 
 ---
 
-## 7. Architecture Roadmap
+## 7. Conversations API Quick Reference
+
+| Endpoint | Description | Auth |
+| --- | --- | --- |
+| `POST /conversations` | Create a new DM or group conversation. | Bearer token |
+| `GET /conversations` | List conversations for the current user (cursor pagination via `cursor` + `take`). | Bearer token |
+| `GET /conversations/:id` | Retrieve conversation metadata and participants. | Bearer token |
+
+Rules of thumb:
+- Direct messages are limited to two unique participants; we prevent duplicate pairs.
+- Group conversations auto-assign the creator as owner and accept an optional title.
+- Every route uses `JwtAuthGuard` and checks membership via `@CurrentUser()`.
+
+Future work (tracked in the blueprint) covers PATCH/DELETE, Redis presence, and richer message previews.
+
+---
+
+## 8. Users API Quick Reference
+
+| Endpoint | Description | Auth |
+| --- | --- | --- |
+| `GET /users` | List all users with basic profile details (admin only). | Bearer token |
+| `GET /users/me` | Return the current authenticated user's record. | Bearer token |
+
+Both routes require a valid JWT. The list endpoint is restricted to tokens that carry the `admin` role and returns id/username/email/avatar metadata ordered by creation time.
+
+---
+
+## 9. Architecture Roadmap
 
 - Add a `POST /users` endpoint to seed accounts.
 - Flesh out conversation/message CRUD and hook Redis into real-time features.

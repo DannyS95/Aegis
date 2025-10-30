@@ -1,22 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { importPKCS8, importSPKI } from 'jose';
+
+type JoseModule = typeof import('jose');
+type ImportedPrivateKey = Awaited<ReturnType<JoseModule['importPKCS8']>>;
+type ImportedPublicKey = Awaited<ReturnType<JoseModule['importSPKI']>>;
 
 @Injectable()
 export class JwtKeyProvider {
   readonly issuer: string;
   readonly accessTokenTtlSeconds: number;
-  private readonly privateKeyPromise: Promise<
-    Awaited<ReturnType<typeof importPKCS8>>
-  >;
-  private readonly publicKeyPromise: Promise<
-    Awaited<ReturnType<typeof importSPKI>>
-  >;
+  private readonly josePromise: Promise<JoseModule>;
+  private readonly privateKeyPromise: Promise<ImportedPrivateKey>;
+  private readonly publicKeyPromise: Promise<ImportedPublicKey>;
 
   constructor() {
     const privateKeyPem = this.readEnv('JWT_PRIVATE_KEY');
     const publicKeyPem = this.readEnv('JWT_PUBLIC_KEY');
-    this.privateKeyPromise = importPKCS8(privateKeyPem, 'RS256');
-    this.publicKeyPromise = importSPKI(publicKeyPem, 'RS256');
+    this.josePromise = import('jose');
+    const joseInitialiser = this.josePromise;
+    this.privateKeyPromise = joseInitialiser.then(({ importPKCS8 }) =>
+      importPKCS8(privateKeyPem, 'RS256'),
+    );
+    this.publicKeyPromise = joseInitialiser.then(({ importSPKI }) =>
+      importSPKI(publicKeyPem, 'RS256'),
+    );
     this.issuer = process.env.JWT_ISSUER ?? 'aegis-backend';
     const ttl = Number(process.env.JWT_ACCESS_TOKEN_TTL ?? '3600');
 
@@ -29,11 +35,11 @@ export class JwtKeyProvider {
     this.accessTokenTtlSeconds = ttl;
   }
 
-  getPrivateKey(): Promise<Awaited<ReturnType<typeof importPKCS8>>> {
+  getPrivateKey(): Promise<ImportedPrivateKey> {
     return this.privateKeyPromise;
   }
 
-  getPublicKey(): Promise<Awaited<ReturnType<typeof importSPKI>>> {
+  getPublicKey(): Promise<ImportedPublicKey> {
     return this.publicKeyPromise;
   }
 

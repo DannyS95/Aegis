@@ -87,12 +87,15 @@ export class AuthService {
     }
 
     const tokenSubject = user.id;
-    const role = this.resolveRole(request.role, 'user');
+    const resolvedRole = this.resolveRole(
+      request.role ?? (user.role as string | undefined),
+      'user',
+    );
 
     return this.issueToken({
       subject: tokenSubject,
       scope: request.scope,
-      role,
+      role: resolvedRole,
       claims: {
         username: user.username,
         email: user.email,

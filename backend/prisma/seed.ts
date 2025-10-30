@@ -7,16 +7,25 @@ const seedUsers = [
     username: 'alice',
     email: 'alice@example.com',
     avatarUrl: 'https://avatars.dicebear.com/api/initials/alice.svg',
+    role: 'user',
   },
   {
     username: 'bob',
     email: 'bob@example.com',
     avatarUrl: 'https://avatars.dicebear.com/api/initials/bob.svg',
+    role: 'user',
   },
   {
     username: 'charlie',
     email: 'charlie@example.com',
     avatarUrl: 'https://avatars.dicebear.com/api/initials/charlie.svg',
+    role: 'user',
+  },
+  {
+    username: 'admin',
+    email: 'admin@example.com',
+    avatarUrl: 'https://avatars.dicebear.com/api/initials/admin.svg',
+    role: 'admin',
   },
 ];
 
@@ -28,6 +37,7 @@ async function main(): Promise<void> {
         update: {
           username: user.username,
           avatarUrl: user.avatarUrl,
+          role: user.role,
         },
         create: user,
       }),
