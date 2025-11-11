@@ -60,14 +60,14 @@ exec:
 	docker compose exec backend $(cmd)
 
 stack-up:
-	docker compose up -d proxy backend
+	docker compose up -d postgres redis backend proxy
 
 stack-down:
-	docker compose down proxy backend
+	docker compose down
 
 stack-restart:
-	docker compose stop proxy backend
-	docker compose up -d proxy backend
+	docker compose stop proxy backend redis postgres
+	docker compose up -d postgres redis backend proxy
 
 test:
 	cd backend && npm test -- --runInBand

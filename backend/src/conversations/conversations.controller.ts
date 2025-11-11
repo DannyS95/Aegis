@@ -7,13 +7,19 @@ import {
   Body,
   Query,
   UseGuards,
+  Delete,
 } from '@nestjs/common';
-import { ConversationsService, ConversationListResponse, ConversationResponse } from './conversations.service';
+import {
+  ConversationsService,
+  ConversationListResponse,
+  ConversationResponse,
+} from './conversations.service';
 import { JwtAuthGuard } from '../security/guards/jwt-auth.guard';
 import { CurrentUser } from '../users/nest/current-user.decorator';
 import type { AuthenticatedUser } from '../security/guards/jwt-auth.guard';
 import type { CreateConversationDto } from './dto/create-conversation.dto';
 import type { ListConversationsQueryDto } from './dto/list-conversations.dto';
+import type { AddParticipantsDto } from './dto/add-participants.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('conversations')
@@ -63,5 +69,31 @@ export class ConversationsController {
     }
 
     return this.conversationsService.getConversationById(id, user.id);
+  }
+
+  @Post(':id/participants')
+  addParticipants(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: AddParticipantsDto,
+  ): Promise<ConversationResponse> {
+    if (!user?.id) {
+      throw new BadRequestException('Authenticated user is required.');
+    }
+
+    return this.conversationsService.addParticipants(id, user.id, body.participantIds);
+  }
+
+  @Delete(':id/participants/:participantId')
+  removeParticipant(
+    @Param('id') id: string,
+    @Param('participantId') participantId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ConversationResponse> {
+    if (!user?.id) {
+      throw new BadRequestException('Authenticated user is required.');
+    }
+
+    return this.conversationsService.removeParticipant(id, user.id, participantId);
   }
 }

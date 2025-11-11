@@ -15,7 +15,7 @@ Welcome to the NestJS service that powers the Aegis chat system. Even if you hav
    ```bash
    cp backend/.env.example backend/.env
    make generate-jwt-keys   # create RSA keys and store them in .env
-   make stack-up            # start nginx proxy + backend + Postgres + Redis
+   make stack-up            # start proxy + backend + Postgres + Redis in one go
    make generate            # generate Prisma client inside the container
    make migrate-deploy      # apply pending Prisma migrations
    make seed                # populate dev users (alice, bob, charlie)
@@ -44,7 +44,7 @@ Welcome to the NestJS service that powers the Aegis chat system. Even if you hav
    make stack-down
    ```
 
-> **Heads up:** `make stack-up` ensures the nginx proxy runs. If you only run `make up`, the backend listens on port 3000 but `http://localhost:4000` (through nginx) will fail.
+> **Heads up:** `make stack-up` now starts the entire stack (Postgres, Redis, Nest backend, and the nginx proxy). Use `make up service=backend` or `service=proxy` when you only need to bounce Node or nginx without touching the databases.
 
 ### If something looks stuck
 
@@ -146,8 +146,8 @@ Following this flow keeps the codebase aligned with our DDD-lite structure while
 
 | Command | Purpose |
 | --- | --- |
-| `make stack-up` | Start nginx proxy + backend (Postgres/Redis start via dependencies) |
-| `make stack-down` | Stop nginx proxy + backend (and the dependent services) |
+| `make stack-up` | Start proxy + backend + Postgres + Redis with one command |
+| `make stack-down` | Stop the entire stack (proxy, backend, Postgres, Redis) |
 | `make up` | Start only the selected service (defaults to backend) |
 | `make down` | Stop only the selected service |
 | `make restart` | Restart the selected service (defaults to backend) |
@@ -202,11 +202,14 @@ You can regenerate keys anytime with `make generate-jwt-keys`; just remember to 
 | `POST /conversations` | Create a new DM or group conversation. | Bearer token |
 | `GET /conversations` | List conversations for the current user (cursor pagination via `cursor` + `take`). | Bearer token |
 | `GET /conversations/:id` | Retrieve conversation metadata and participants. | Bearer token |
+| `POST /conversations/:id/participants` | Owners add one or more participants to a group conversation. | Bearer token |
+| `DELETE /conversations/:id/participants/:participantId` | Remove a participant (owners remove others; members can leave themselves). | Bearer token |
 
 Rules of thumb:
 - Direct messages are limited to two unique participants; we prevent duplicate pairs.
 - Group conversations auto-assign the creator as owner and accept an optional title.
 - Every route uses `JwtAuthGuard` and checks membership via `@CurrentUser()`.
+- Only owners can invite or remove other members; members may only remove themselves.
 
 Future work (tracked in the blueprint) covers PATCH/DELETE, Redis presence, and richer message previews.
 

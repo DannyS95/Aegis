@@ -31,6 +31,19 @@ describe('ConversationsService', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
       },
+      participant: {
+        createMany: jest.fn(),
+        delete: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn((callback) =>
+        callback({
+          participant: {
+            delete: prisma.participant.delete,
+            update: prisma.participant.update,
+          },
+        }),
+      ),
     };
 
     usersService = {
@@ -133,6 +146,141 @@ describe('ConversationsService', () => {
 
       expect(result.id).toBe(record.id);
       expect(result.participants).toHaveLength(2);
+    });
+  });
+
+  describe('addParticipants', () => {
+    const groupConversation = {
+      id: 'conversation-1',
+      title: 'Squad',
+      isGroup: true,
+      lastMessageId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      participants: [
+        { ...sampleParticipant(creatorId), role: 'owner' },
+        sampleParticipant(otherUserId),
+      ],
+    };
+
+    it('adds new members when requested by an owner', async () => {
+      const refreshedConversation = {
+        ...groupConversation,
+        participants: [
+          ...groupConversation.participants,
+          sampleParticipant('user-3'),
+        ],
+      };
+
+      prisma.conversation.findUnique
+        .mockResolvedValueOnce(groupConversation)
+        .mockResolvedValueOnce(refreshedConversation);
+
+      usersService.findManyByIds.mockResolvedValue([{ id: 'user-3' }]);
+      prisma.participant.createMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.addParticipants('conversation-1', creatorId, [
+        'user-3',
+      ]);
+
+      expect(prisma.participant.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [{ userId: 'user-3', conversationId: 'conversation-1', role: 'member' }],
+        }),
+      );
+      expect(result.participants).toHaveLength(3);
+    });
+
+    it('rejects non-owners attempting to add', async () => {
+      prisma.conversation.findUnique.mockResolvedValue(groupConversation);
+
+      await expect(
+        service.addParticipants('conversation-1', otherUserId, ['user-3']),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('removeParticipant', () => {
+    const groupConversation = {
+      id: 'conversation-1',
+      title: 'Squad',
+      isGroup: true,
+      lastMessageId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      participants: [
+        { ...sampleParticipant(creatorId), role: 'owner' },
+        { ...sampleParticipant(otherUserId), joinedAt: new Date('2024-02-01T00:00:00.000Z') },
+        { ...sampleParticipant('user-3'), joinedAt: new Date('2024-03-01T00:00:00.000Z') },
+      ],
+    };
+
+    it('removes a participant when requested by an owner', async () => {
+      prisma.conversation.findUnique
+        .mockResolvedValueOnce(groupConversation)
+        .mockResolvedValueOnce({
+          ...groupConversation,
+          participants: groupConversation.participants.filter(
+            (participant) => participant.userId !== 'user-3',
+          ),
+        });
+
+      prisma.participant.delete.mockResolvedValue(undefined);
+      prisma.participant.update.mockResolvedValue(undefined);
+
+      const result = await service.removeParticipant('conversation-1', creatorId, 'user-3');
+
+      expect(prisma.participant.delete).toHaveBeenCalledWith({
+        where: {
+          conversationId_userId: {
+            conversationId: 'conversation-1',
+            userId: 'user-3',
+          },
+        },
+      });
+      expect(result.participants).toHaveLength(2);
+    });
+
+    it('promotes the oldest member when the owner leaves', async () => {
+      const withoutOwner = {
+        ...groupConversation,
+        participants: groupConversation.participants.filter(
+          (participant) => participant.userId !== creatorId,
+        ),
+      };
+
+      prisma.conversation.findUnique
+        .mockResolvedValueOnce(groupConversation)
+        .mockResolvedValueOnce({
+          ...withoutOwner,
+          participants: withoutOwner.participants.map((participant, index) =>
+            index === 0 ? { ...participant, role: 'owner' } : participant,
+          ),
+        });
+
+      prisma.participant.delete.mockResolvedValue(undefined);
+      prisma.participant.update.mockResolvedValue(undefined);
+
+      const result = await service.removeParticipant('conversation-1', creatorId, creatorId);
+
+      expect(prisma.participant.update).toHaveBeenCalledWith({
+        where: {
+          conversationId_userId: {
+            conversationId: 'conversation-1',
+            userId: otherUserId,
+          },
+        },
+        data: { role: 'owner' },
+      });
+      expect(result.participants.find((p) => p.user.id === otherUserId)?.role).toBe('owner');
+    });
+
+    it('prevents members from removing others', async () => {
+      prisma.conversation.findUnique.mockResolvedValue(groupConversation);
+
+      await expect(
+        service.removeParticipant('conversation-1', otherUserId, 'user-3'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });

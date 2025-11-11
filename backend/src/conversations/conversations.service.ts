@@ -113,10 +113,7 @@ export class ConversationsService {
       );
     }
 
-    const users = await this.usersService.findManyByIds(participantIds);
-    if (users.length !== participantIds.length) {
-      throw new NotFoundException('One or more participants could not be found.');
-    }
+    await this.assertUsersExist(participantIds);
 
     if (!isGroupConversation) {
       await this.assertDirectConversationIsUnique(participantIds);
@@ -198,6 +195,108 @@ export class ConversationsService {
     }
 
     return this.mapConversation(conversation);
+  }
+
+  async addParticipants(
+    conversationId: string,
+    requesterId: string,
+    participantIds: string[] | undefined,
+  ): Promise<ConversationResponse> {
+    const uniqueIds = this.extractParticipantIds(participantIds);
+    if (!uniqueIds.length) {
+      throw new BadRequestException('Provide at least one participant to add.');
+    }
+
+    const { conversation } = await this.loadGroupConversationForAction(
+      conversationId,
+      requesterId,
+      'Cannot add participants to a direct conversation.',
+      { requireOwner: true, ownerErrorMessage: 'Only owners can add participants.' },
+    );
+
+    const existingIds = new Set(
+      conversation.participants.map((participant) => participant.userId),
+    );
+
+    const candidates = uniqueIds.filter((id) => !existingIds.has(id));
+
+    if (!candidates.length) {
+      throw new ConflictException(
+        'All supplied participants already belong to the conversation.',
+      );
+    }
+
+    await this.assertUsersExist(candidates);
+
+    await this.prisma.participant.createMany({
+      data: candidates.map((userId) => ({
+        userId,
+        conversationId,
+        role: 'member',
+      })),
+      skipDuplicates: true,
+    });
+
+    const refreshed = await this.fetchConversationOrThrow(conversationId);
+    return this.mapConversation(refreshed);
+  }
+
+  async removeParticipant(
+    conversationId: string,
+    requesterId: string,
+    participantId: string,
+  ): Promise<ConversationResponse> {
+    const { conversation, requester } = await this.loadGroupConversationForAction(
+      conversationId,
+      requesterId,
+      'Cannot remove participants from a direct conversation.',
+    );
+
+    const target = conversation.participants.find(
+      (participant) => participant.userId === participantId,
+    );
+
+    if (!target) {
+      throw new NotFoundException('Participant not found.');
+    }
+
+    const removingSelf = participantId === requesterId;
+
+    if (!removingSelf && requester.role !== 'owner') {
+      throw new ForbiddenException('Only owners can remove other participants.');
+    }
+
+    const promoteUserId = target.role === 'owner'
+      ? this.resolveNextOwner(conversation.participants, participantId)
+      : null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participant.delete({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: participantId,
+          },
+        },
+      });
+
+      if (promoteUserId) {
+        await tx.participant.update({
+          where: {
+            conversationId_userId: {
+              conversationId,
+              userId: promoteUserId,
+            },
+          },
+          data: {
+            role: 'owner',
+          },
+        });
+      }
+    });
+
+    const refreshed = await this.fetchConversationOrThrow(conversationId);
+    return this.mapConversation(refreshed);
   }
 
   private async assertDirectConversationIsUnique(participantIds: string[]) {
@@ -306,5 +405,105 @@ export class ConversationsService {
     }
 
     return Math.min(Math.max(candidate, 1), 50);
+  }
+
+  private extractParticipantIds(participants?: string[]): string[] {
+    if (!Array.isArray(participants)) {
+      return [];
+    }
+
+    const unique = new Set<string>();
+
+    participants.forEach((candidate) => {
+      if (typeof candidate === 'string') {
+        const normalized = candidate.trim();
+        if (normalized) {
+          unique.add(normalized);
+        }
+      }
+    });
+
+    return Array.from(unique);
+  }
+
+  private async assertUsersExist(userIds: string[]) {
+    if (!userIds.length) {
+      return;
+    }
+
+    const users = await this.usersService.findManyByIds(userIds);
+    if (users.length !== userIds.length) {
+      throw new NotFoundException('One or more participants could not be found.');
+    }
+  }
+
+  private async fetchConversationOrThrow(
+    conversationId: string,
+  ): Promise<ConversationWithParticipants> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: conversationInclude,
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found.');
+    }
+
+    return conversation;
+  }
+
+  private async loadGroupConversationForAction(
+    conversationId: string,
+    requesterId: string,
+    directConversationError: string,
+    options: { requireOwner?: boolean; ownerErrorMessage?: string } = {},
+  ): Promise<{
+    conversation: ConversationWithParticipants;
+    requester: ConversationWithParticipants['participants'][number];
+  }> {
+    const conversation = await this.fetchConversationOrThrow(conversationId);
+
+    if (!conversation.isGroup) {
+      throw new BadRequestException(directConversationError);
+    }
+
+    const requester = conversation.participants.find(
+      (participant) => participant.userId === requesterId,
+    );
+
+    if (!requester) {
+      throw new ForbiddenException('You do not have access to this conversation.');
+    }
+
+    if (options.requireOwner && requester.role !== 'owner') {
+      throw new ForbiddenException(
+        options.ownerErrorMessage ?? 'Only owners can perform this action.',
+      );
+    }
+
+    return { conversation, requester };
+  }
+
+  private resolveNextOwner(
+    participants: ConversationWithParticipants['participants'],
+    departingUserId: string,
+  ): string | null {
+    const remaining = participants.filter(
+      (participant) => participant.userId !== departingUserId,
+    );
+
+    const remainingOwner = remaining.some(
+      (participant) => participant.role === 'owner',
+    );
+
+    if (remainingOwner || remaining.length === 0) {
+      return null;
+    }
+
+    const nextOwner = remaining.reduce((acc, participant) =>
+      participant.joinedAt < acc.joinedAt ? participant : acc,
+    );
+
+    return nextOwner.userId;
   }
 }
