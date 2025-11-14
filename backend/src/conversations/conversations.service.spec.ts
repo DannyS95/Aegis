@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
 
 const sampleParticipant = (userId: string) => ({
@@ -54,6 +59,67 @@ describe('ConversationsService', () => {
   });
 
   describe('createConversation', () => {
+    it('requires at least two participants', async () => {
+      await expect(
+        service.createConversation(creatorId, { participants: [] }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects direct conversations that include more than two participants', async () => {
+      await expect(
+        service.createConversation(creatorId, {
+          participants: [otherUserId, 'user-3'],
+          isGroup: false,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('promotes the creator to owner for inferred group conversations', async () => {
+      usersService.findManyByIds.mockResolvedValue([
+        { id: creatorId },
+        { id: otherUserId },
+        { id: 'user-3' },
+      ]);
+      prisma.conversation.findFirst.mockResolvedValue(null);
+
+      const conversationRecord = {
+        id: 'conversation-group',
+        title: 'Team',
+        isGroup: true,
+        lastMessageId: null,
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+        participants: [
+          { ...sampleParticipant(creatorId), role: 'owner' },
+          sampleParticipant(otherUserId),
+          sampleParticipant('user-3'),
+        ],
+      };
+
+      prisma.conversation.create.mockResolvedValue(conversationRecord);
+
+      const response = await service.createConversation(creatorId, {
+        participants: [otherUserId, 'user-3'],
+        title: '  Team ',
+      });
+
+      expect(prisma.conversation.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isGroup: true,
+            title: 'Team',
+            participants: expect.objectContaining({
+              create: expect.arrayContaining([
+                expect.objectContaining({ userId: creatorId, role: 'owner' }),
+              ]),
+            }),
+          }),
+        }),
+      );
+      expect(response.isGroup).toBe(true);
+      expect(response.participants.find((p) => p.user.id === creatorId)?.role).toBe('owner');
+    });
+
     it('creates a direct conversation when no duplicate exists', async () => {
       usersService.findManyByIds.mockResolvedValue([
         { id: creatorId },
@@ -101,6 +167,27 @@ describe('ConversationsService', () => {
       await expect(
         service.createConversation(creatorId, { participants: [otherUserId] }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('listConversations', () => {
+    it('returns the denormalised lastMessageId for each conversation', async () => {
+      const record = {
+        id: 'conversation-1',
+        title: null,
+        isGroup: false,
+        lastMessageId: 'message-9',
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+        participants: [sampleParticipant(creatorId), sampleParticipant(otherUserId)],
+      };
+
+      prisma.conversation.findMany.mockResolvedValue([record]);
+
+      const result = await service.listConversations(creatorId);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].lastMessageId).toBe('message-9');
     });
   });
 
