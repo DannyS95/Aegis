@@ -35,6 +35,7 @@ describe('ConversationsService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
       participant: {
         createMany: jest.fn(),
@@ -138,6 +139,7 @@ describe('ConversationsService', () => {
       };
 
       prisma.conversation.create.mockResolvedValue(conversationRecord);
+      prisma.conversation.update.mockResolvedValue(conversationRecord);
 
       const response = await service.createConversation(creatorId, {
         participants: [otherUserId],
@@ -262,6 +264,7 @@ describe('ConversationsService', () => {
       prisma.conversation.findUnique
         .mockResolvedValueOnce(groupConversation)
         .mockResolvedValueOnce(refreshedConversation);
+      prisma.conversation.update.mockResolvedValue(refreshedConversation);
 
       usersService.findManyByIds.mockResolvedValue([{ id: 'user-3' }]);
       prisma.participant.createMany.mockResolvedValue({ count: 1 });
@@ -275,6 +278,10 @@ describe('ConversationsService', () => {
           data: [{ userId: 'user-3', conversationId: 'conversation-1', role: 'member' }],
         }),
       );
+      expect(prisma.conversation.update).toHaveBeenCalledWith({
+        where: { id: 'conversation-1' },
+        data: expect.objectContaining({ updatedAt: expect.any(Date) }),
+      });
       expect(result.participants).toHaveLength(3);
     });
 
@@ -311,6 +318,7 @@ describe('ConversationsService', () => {
             (participant) => participant.userId !== 'user-3',
           ),
         });
+      prisma.conversation.update.mockResolvedValue(groupConversation);
 
       prisma.participant.delete.mockResolvedValue(undefined);
       prisma.participant.update.mockResolvedValue(undefined);
@@ -324,6 +332,10 @@ describe('ConversationsService', () => {
             userId: 'user-3',
           },
         },
+      });
+      expect(prisma.conversation.update).toHaveBeenCalledWith({
+        where: { id: 'conversation-1' },
+        data: expect.objectContaining({ updatedAt: expect.any(Date) }),
       });
       expect(result.participants).toHaveLength(2);
     });
@@ -344,6 +356,7 @@ describe('ConversationsService', () => {
             index === 0 ? { ...participant, role: 'owner' } : participant,
           ),
         });
+      prisma.conversation.update.mockResolvedValue(groupConversation);
 
       prisma.participant.delete.mockResolvedValue(undefined);
       prisma.participant.update.mockResolvedValue(undefined);
@@ -358,6 +371,10 @@ describe('ConversationsService', () => {
           },
         },
         data: { role: 'owner' },
+      });
+      expect(prisma.conversation.update).toHaveBeenCalledWith({
+        where: { id: 'conversation-1' },
+        data: expect.objectContaining({ updatedAt: expect.any(Date) }),
       });
       expect(result.participants.find((p) => p.user.id === otherUserId)?.role).toBe('owner');
     });

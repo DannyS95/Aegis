@@ -34,7 +34,6 @@ model Conversation {
 }
 
 model Participant {
-  id             String        @id @default(uuid())
   userId         String
   conversationId String
   user           User          @relation(fields: [userId], references: [id])
@@ -47,7 +46,7 @@ model Participant {
   muted          Boolean       @default(false)
   banned         Boolean       @default(false)
 
-  @@unique([conversationId, userId])
+  @@id([conversationId, userId])
 }
 
 model Message {

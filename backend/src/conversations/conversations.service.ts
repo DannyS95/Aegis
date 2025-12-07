@@ -71,7 +71,6 @@ interface ConversationWithParticipants {
   createdAt: Date;
   updatedAt: Date;
   participants: Array<{
-    id: string;
     userId: string;
     conversationId: string;
     role: string;
@@ -237,6 +236,8 @@ export class ConversationsService {
       skipDuplicates: true,
     });
 
+    await this.touchConversation(conversationId);
+
     const refreshed = await this.fetchConversationOrThrow(conversationId);
     return this.mapConversation(refreshed);
   }
@@ -294,6 +295,8 @@ export class ConversationsService {
         });
       }
     });
+
+    await this.touchConversation(conversationId);
 
     const refreshed = await this.fetchConversationOrThrow(conversationId);
     return this.mapConversation(refreshed);
@@ -505,5 +508,12 @@ export class ConversationsService {
     );
 
     return nextOwner.userId;
+  }
+
+  private async touchConversation(conversationId: string): Promise<void> {
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    });
   }
 }
