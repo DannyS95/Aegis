@@ -17,9 +17,9 @@ import {
 import { JwtAuthGuard } from '../security/guards/jwt-auth.guard';
 import { CurrentUser } from '../users/nest/current-user.decorator';
 import type { AuthenticatedUser } from '../security/guards/jwt-auth.guard';
-import type { CreateConversationDto } from './dto/create-conversation.dto';
-import type { ListConversationsQueryDto } from './dto/list-conversations.dto';
-import type { AddParticipantsDto } from './dto/add-participants.dto';
+import { CreateConversationDto } from './dto/create-conversation.dto';
+import { ListConversationsQueryDto } from './dto/list-conversations.dto';
+import { AddParticipantsDto } from './dto/add-participants.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('conversations')
@@ -47,15 +47,9 @@ export class ConversationsController {
       throw new BadRequestException('Authenticated user is required.');
     }
 
-    const take = query.take !== undefined ? Number(query.take) : undefined;
-
-    if (query.take !== undefined && Number.isNaN(take)) {
-      throw new BadRequestException('Query parameter "take" must be a number.');
-    }
-
     return this.conversationsService.listConversations(user.id, {
       cursor: query.cursor,
-      take,
+      take: query.take,
     });
   }
 

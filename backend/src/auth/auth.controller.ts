@@ -8,8 +8,9 @@ import {
   Req,
 } from '@nestjs/common';
 import { AuthService, TokenResponse } from './auth.service';
-import type { IssueTokenRequest, LoginRequest } from './auth.service';
 import type { Request } from 'express';
+import { IssueTokenDto } from './dto/issue-token.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -18,7 +19,7 @@ export class AuthController {
   @HttpCode(200)
   @Post('token')
   async issueToken(
-    @Body() body: IssueTokenRequest = {},
+    @Body() body: IssueTokenDto,
   ): Promise<TokenResponse> {
     return this.authService.issueToken(body);
   }
@@ -33,7 +34,7 @@ export class AuthController {
 
   @HttpCode(200)
   @Post('login')
-  async login(@Body() body: LoginRequest = {}): Promise<TokenResponse> {
+  async login(@Body() body: LoginDto): Promise<TokenResponse> {
     return this.authService.login(body);
   }
 }

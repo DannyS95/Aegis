@@ -1,4 +1,13 @@
-export interface ListConversationsQueryDto {
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+
+export class ListConversationsQueryDto {
+  @IsOptional()
+  @IsString()
   cursor?: string;
-  take?: string | number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  take?: number;
 }

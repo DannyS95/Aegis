@@ -6,9 +6,9 @@ import {
   type ConversationResponse,
 } from './conversations.service';
 import type { AuthenticatedUser } from '../security/guards/jwt-auth.guard';
-import type { CreateConversationDto } from './dto/create-conversation.dto';
-import type { ListConversationsQueryDto } from './dto/list-conversations.dto';
-import type { AddParticipantsDto } from './dto/add-participants.dto';
+import { CreateConversationDto } from './dto/create-conversation.dto';
+import { ListConversationsQueryDto } from './dto/list-conversations.dto';
+import { AddParticipantsDto } from './dto/add-participants.dto';
 
 const sampleConversation = (): ConversationResponse => ({
   id: 'conversation-1',
@@ -69,17 +69,11 @@ describe('ConversationsController', () => {
       ).toThrow(BadRequestException);
     });
 
-    it('validates that take must be numeric', () => {
-      expect(() => controller.listConversations(user, { take: 'invalid' })).toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('coerces take to a number before delegating', async () => {
+    it('delegates query params to the service', async () => {
       const response = sampleListResponse();
       service.listConversations.mockResolvedValue(response);
 
-      const query: ListConversationsQueryDto = { take: '10', cursor: 'cursor-1' };
+      const query: ListConversationsQueryDto = { take: 10, cursor: 'cursor-1' };
       const result = await controller.listConversations(user, query);
 
       expect(service.listConversations).toHaveBeenCalledWith(user.id, {
