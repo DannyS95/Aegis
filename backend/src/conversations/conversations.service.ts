@@ -8,8 +8,15 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { ConversationNotFoundException } from '../common/exceptions/conversation-not-found.exception';
+import { NotConversationParticipantException } from '../common/exceptions/not-conversation-participant.exception';
 
 interface ListConversationsQuery {
+  cursor?: string;
+  take?: number;
+}
+
+interface ListMessagesQuery {
   cursor?: string;
   take?: number;
 }
@@ -43,6 +50,20 @@ export interface ConversationListResponse {
   nextCursor: string | null;
 }
 
+export interface MessageResponse {
+  id: string;
+  content: string;
+  senderId: string;
+  conversationId: string;
+  createdAt: Date;
+  readAt: Date | null;
+}
+
+export interface MessageListResponse {
+  items: MessageResponse[];
+  nextCursor: string | null;
+}
+
 const participantUserSelect = {
   id: true,
   username: true,
@@ -61,6 +82,15 @@ const conversationInclude = {
       joinedAt: 'asc',
     },
   },
+} as const;
+
+const messageSelect = {
+  id: true,
+  content: true,
+  senderId: true,
+  conversationId: true,
+  createdAt: true,
+  readAt: true,
 } as const;
 
 interface ConversationWithParticipants {
@@ -182,7 +212,7 @@ export class ConversationsService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found.');
+      throw new ConversationNotFoundException();
     }
 
     const isParticipant = conversation.participants.some(
@@ -300,6 +330,97 @@ export class ConversationsService {
 
     const refreshed = await this.fetchConversationOrThrow(conversationId);
     return this.mapConversation(refreshed);
+  }
+
+  async sendMessage(
+    conversationId: string,
+    senderId: string,
+    dto: { content: string },
+  ): Promise<MessageResponse> {
+    const membership = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: {
+        id: true,
+        participants: {
+          where: { userId: senderId },
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new ConversationNotFoundException();
+    }
+
+    if (!membership.participants.length) {
+      throw new NotConversationParticipantException();
+    }
+
+    const normalizedContent = dto.content.trim();
+
+    const message = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.message.create({
+        data: {
+          content: normalizedContent,
+          senderId,
+          conversationId,
+        },
+        select: messageSelect,
+      });
+
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { lastMessageId: created.id },
+      });
+
+      return created;
+    });
+
+    return message;
+  }
+
+  async listMessages(
+    conversationId: string,
+    userId: string,
+    query: ListMessagesQuery = {},
+  ): Promise<MessageListResponse> {
+    const limit = this.resolveMessageTake(query.take);
+
+    const membership = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: {
+        id: true,
+        participants: {
+          where: { userId },
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new ConversationNotFoundException();
+    }
+
+    if (!membership.participants.length) {
+      throw new NotConversationParticipantException();
+    }
+
+    const messages = await this.prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      skip: query.cursor ? 1 : 0,
+      cursor: query.cursor ? { id: query.cursor } : undefined,
+      select: messageSelect,
+    });
+
+    const hasMore = messages.length > limit;
+    const items = hasMore ? messages.slice(0, limit) : messages;
+
+    return {
+      items,
+      nextCursor: hasMore ? messages[limit].id : null,
+    };
   }
 
   private async assertDirectConversationIsUnique(participantIds: string[]) {
@@ -449,7 +570,7 @@ export class ConversationsService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found.');
+      throw new ConversationNotFoundException();
     }
 
     return conversation;
@@ -515,5 +636,15 @@ export class ConversationsService {
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });
+  }
+
+  private resolveMessageTake(candidate?: number): number {
+    const defaultTake = 20;
+
+    if (candidate === undefined || Number.isNaN(candidate)) {
+      return defaultTake;
+    }
+
+    return Math.min(Math.max(candidate, 1), 100);
   }
 }

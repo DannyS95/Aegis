@@ -2,9 +2,10 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  NotFoundException,
 } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
+import { ConversationNotFoundException } from '../common/exceptions/conversation-not-found.exception';
+import { NotConversationParticipantException } from '../common/exceptions/not-conversation-participant.exception';
 
 const sampleParticipant = (userId: string) => ({
   userId,
@@ -37,6 +38,10 @@ describe('ConversationsService', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      message: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
       participant: {
         createMany: jest.fn(),
         delete: jest.fn(),
@@ -47,6 +52,12 @@ describe('ConversationsService', () => {
           participant: {
             delete: prisma.participant.delete,
             update: prisma.participant.update,
+          },
+          message: {
+            create: prisma.message.create,
+          },
+          conversation: {
+            update: prisma.conversation.update,
           },
         }),
       ),
@@ -199,7 +210,7 @@ describe('ConversationsService', () => {
 
       await expect(
         service.getConversationById('missing', creatorId),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(ConversationNotFoundException);
     });
 
     it('throws Forbidden when user is not a participant', async () => {
@@ -385,6 +396,113 @@ describe('ConversationsService', () => {
       await expect(
         service.removeParticipant('conversation-1', otherUserId, 'user-3'),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('sendMessage', () => {
+    const conversationId = 'conversation-1';
+    const messageRecord = {
+      id: 'msg-1',
+      content: 'hello',
+      senderId: creatorId,
+      conversationId,
+      createdAt: new Date(),
+      readAt: null,
+    };
+
+    it('rejects when conversation is missing', async () => {
+      prisma.conversation.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.sendMessage(conversationId, creatorId, { content: 'hello' }),
+      ).rejects.toBeInstanceOf(ConversationNotFoundException);
+    });
+
+    it('rejects when user is not a participant', async () => {
+      prisma.conversation.findUnique.mockResolvedValue({
+        id: conversationId,
+        participants: [],
+      });
+
+      await expect(
+        service.sendMessage(conversationId, creatorId, { content: 'hello' }),
+      ).rejects.toBeInstanceOf(NotConversationParticipantException);
+    });
+
+    it('creates a message and updates lastMessageId', async () => {
+      prisma.conversation.findUnique.mockResolvedValue({
+        id: conversationId,
+        participants: [{ userId: creatorId }],
+      });
+      prisma.message.create.mockResolvedValue(messageRecord);
+      prisma.conversation.update.mockResolvedValue(undefined);
+
+      const result = await service.sendMessage(conversationId, creatorId, { content: ' hello ' });
+
+      expect(prisma.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            content: 'hello',
+            senderId: creatorId,
+            conversationId,
+          }),
+        }),
+      );
+      expect(prisma.conversation.update).toHaveBeenCalledWith({
+        where: { id: conversationId },
+        data: { lastMessageId: messageRecord.id },
+      });
+      expect(result).toEqual(messageRecord);
+    });
+  });
+
+  describe('listMessages', () => {
+    const conversationId = 'conversation-1';
+    const messageRecord = {
+      id: 'msg-1',
+      content: 'hello',
+      senderId: creatorId,
+      conversationId,
+      createdAt: new Date(),
+      readAt: null,
+    };
+
+    it('throws when conversation is missing', async () => {
+      prisma.conversation.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.listMessages(conversationId, creatorId, {}),
+      ).rejects.toBeInstanceOf(ConversationNotFoundException);
+    });
+
+    it('throws when user is not a participant', async () => {
+      prisma.conversation.findUnique.mockResolvedValue({
+        id: conversationId,
+        participants: [],
+      });
+
+      await expect(
+        service.listMessages(conversationId, creatorId, {}),
+      ).rejects.toBeInstanceOf(NotConversationParticipantException);
+    });
+
+    it('paginates messages in descending order', async () => {
+      prisma.conversation.findUnique.mockResolvedValue({
+        id: conversationId,
+        participants: [{ userId: creatorId }],
+      });
+      prisma.message.findMany.mockResolvedValue([messageRecord]);
+
+      const result = await service.listMessages(conversationId, creatorId, { take: 10 });
+
+      expect(prisma.message.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { conversationId },
+          orderBy: { createdAt: 'desc' },
+          take: 11,
+        }),
+      );
+      expect(result).toEqual({ items: [messageRecord], nextCursor: null });
     });
   });
 });

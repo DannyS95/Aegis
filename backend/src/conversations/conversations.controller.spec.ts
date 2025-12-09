@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { ConversationsController } from './conversations.controller';
 import {
   ConversationsService,
@@ -9,6 +8,7 @@ import type { AuthenticatedUser } from '../security/guards/jwt-auth.guard';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations.dto';
 import { AddParticipantsDto } from './dto/add-participants.dto';
+import { MissingUserContextException } from '../common/exceptions/missing-user-context.exception';
 
 const sampleConversation = (): ConversationResponse => ({
   id: 'conversation-1',
@@ -37,6 +37,8 @@ describe('ConversationsController', () => {
       getConversationById: jest.fn(),
       addParticipants: jest.fn(),
       removeParticipant: jest.fn(),
+      sendMessage: jest.fn(),
+      listMessages: jest.fn(),
     } as unknown as jest.Mocked<ConversationsService>;
 
     controller = new ConversationsController(service);
@@ -48,7 +50,7 @@ describe('ConversationsController', () => {
     it('throws when no authenticated user is provided', () => {
       expect(() =>
         controller.createConversation(undefined as unknown as AuthenticatedUser, payload),
-      ).toThrow(BadRequestException);
+      ).toThrow(MissingUserContextException);
     });
 
     it('delegates to the service with the user id and body', async () => {
@@ -66,7 +68,7 @@ describe('ConversationsController', () => {
     it('throws when user context is missing', () => {
       expect(() =>
         controller.listConversations(undefined as unknown as AuthenticatedUser, {}),
-      ).toThrow(BadRequestException);
+      ).toThrow(MissingUserContextException);
     });
 
     it('delegates query params to the service', async () => {
@@ -88,7 +90,7 @@ describe('ConversationsController', () => {
     it('throws when user context is missing', () => {
       expect(() =>
         controller.getConversation('conversation-1', undefined as unknown as AuthenticatedUser),
-      ).toThrow(BadRequestException);
+      ).toThrow(MissingUserContextException);
     });
 
     it('requests the conversation from the service', async () => {
@@ -108,7 +110,7 @@ describe('ConversationsController', () => {
     it('throws when user context is missing', () => {
       expect(() =>
         controller.addParticipants('conversation-1', undefined as unknown as AuthenticatedUser, body),
-      ).toThrow(BadRequestException);
+      ).toThrow(MissingUserContextException);
     });
 
     it('passes participant payloads to the service', async () => {
@@ -134,7 +136,7 @@ describe('ConversationsController', () => {
           'user-456',
           undefined as unknown as AuthenticatedUser,
         ),
-      ).toThrow(BadRequestException);
+      ).toThrow(MissingUserContextException);
     });
 
     it('delegates removal to the service', async () => {
@@ -144,6 +146,44 @@ describe('ConversationsController', () => {
       const result = await controller.removeParticipant('conversation-1', 'user-456', user);
 
       expect(service.removeParticipant).toHaveBeenCalledWith('conversation-1', user.id, 'user-456');
+      expect(result).toBe(response);
+    });
+  });
+
+  describe('sendMessage', () => {
+    const body = { content: 'hello' };
+
+    it('throws when user context is missing', () => {
+      expect(() =>
+        controller.sendMessage('conversation-1', undefined as unknown as AuthenticatedUser, body),
+      ).toThrow(MissingUserContextException);
+    });
+
+    it('delegates to the service', async () => {
+      const response = { id: 'msg-1' };
+      service.sendMessage.mockResolvedValue(response as any);
+
+      const result = await controller.sendMessage('conversation-1', user, body as any);
+
+      expect(service.sendMessage).toHaveBeenCalledWith('conversation-1', user.id, body as any);
+      expect(result).toBe(response);
+    });
+  });
+
+  describe('listMessages', () => {
+    it('throws when user context is missing', () => {
+      expect(() =>
+        controller.listMessages('conversation-1', undefined as unknown as AuthenticatedUser, {}),
+      ).toThrow(MissingUserContextException);
+    });
+
+    it('delegates to the service', async () => {
+      const response = { items: [], nextCursor: null };
+      service.listMessages.mockResolvedValue(response as any);
+
+      const result = await controller.listMessages('conversation-1', user, { take: 10 });
+
+      expect(service.listMessages).toHaveBeenCalledWith('conversation-1', user.id, { take: 10 });
       expect(result).toBe(response);
     });
   });
