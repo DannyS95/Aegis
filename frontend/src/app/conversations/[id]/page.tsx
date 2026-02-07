@@ -4,145 +4,113 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MessageBubble from "@/components/MessageBubble";
 import { useUser } from "@/context/UserContext";
-import ChatInput from "@/components/ChatInput"; // Adjust the path if necessary
-
-type Message = {
-  id: number;
-  sender: string;
-  text: string;
-  type?: "user" | "system";
-  timestamp?: string;
-  status?: "sent" | "delivered" | "read";
-  replyTo?: {
-    id: number;
-    sender: string;
-    text: string;
-  };
-};
+import ChatInput from "@/components/ChatInput";
+import {
+  type Conversation,
+  type Message,
+  getConversation,
+  getMessages,
+  sendMessage,
+} from "@/lib/conversationsApi";
 
 export default function ChatWindowPage() {
-  const [messages, setMessages] = useState<Message[] | null>(null); // null = loading
-  const [typing, setTyping] = useState(false);
-  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
-  const { user } = useUser();
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const { user, token } = useUser();
 
   const params = useParams();
   const router = useRouter();
-  const convoId = params?.id;
+  const convoId =
+    typeof params?.id === "string"
+      ? params.id
+      : Array.isArray(params?.id)
+        ? params.id[0]
+        : undefined;
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !token) {
       router.replace("/login");
     }
-  }, [user, router]);
+  }, [router, token, user]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing]);
-
-  // simulate loading messages
-  useEffect(() => {
-    if (!user) {
+    if (!user || !token || !convoId) {
       return;
     }
 
-    const timer = setTimeout(() => {
-      setMessages([
-        { id: 1, sender: "system", text: "Alice joined the chat", type: "system" },
-        { id: 2, sender: "Alice", text: "Hey, are we still on for tomorrow?", timestamp: "10:30 AM" },
-        {
-          id: 3,
-          sender: user.username,
-          text: "Yep! 10am at the café.",
-          timestamp: "10:31 AM",
-          status: "read",
-          replyTo: {
-            id: 2,
-            sender: "Alice",
-            text: "Hey, are we still on for tomorrow?",
-          },
-        },
-      ]);
-    }, 500); // shorter delay for more natural UX
-    return () => clearTimeout(timer);
-  }, [user]);
+    const load = async () => {
+      try {
+        setError(null);
+        setLoading(true);
+        const [conversationResponse, messagesResponse] = await Promise.all([
+          getConversation(token, convoId),
+          getMessages(token, convoId),
+        ]);
 
-  const handleSend = (text: string) => {
-    if (!text.trim() || !user) return;
-
-    const replyContext = replyTarget
-      ? {
-          id: replyTarget.id,
-          sender: replyTarget.sender,
-          text: replyTarget.text,
-        }
-      : undefined;
-
-    const newMessage: Message = {
-      id: Date.now(),
-      sender: user.username,
-      text,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      status: "sent",
-      replyTo: replyContext,
+        setConversation(conversationResponse);
+        setMessages(messagesResponse.items);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Unable to load conversation.",
+        );
+        setMessages([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    setMessages((prev) => (prev ? [...prev, newMessage] : [newMessage]));
-    setReplyTarget(null);
+    load();
+  }, [convoId, token, user]);
 
-    // simulate server delivery after 1s
-    setTimeout(() => {
-      setMessages((prev) => {
-        if (!prev) return prev;
-        return prev.map((msg) =>
-          msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg
-        );
-      });
-    }, 1000);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-    // simulate recipient read after 3s
-    setTimeout(() => {
-      setMessages((prev) => {
-        if (!prev) return prev;
-        return prev.map((msg) =>
-          msg.id === newMessage.id ? { ...msg, status: "read" } : msg
-        );
-      });
-    }, 3000);
-
-    // simulate Alice typing + reply
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      const reply: Message = {
-        id: Date.now(),
-        sender: "Alice",
-        text: "Sounds good 👍",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        replyTo: {
-          id: newMessage.id,
-          sender: user.username,
-          text,
-        },
-      };
-      setMessages((prev) => (prev ? [...prev, reply] : [reply]));
-    }, 4000);
+  const resolveSenderName = (senderId: string) => {
+    const participant = conversation?.participants.find(
+      (p) => p.user.id === senderId,
+    );
+    return (
+      participant?.user.username ||
+      participant?.user.email ||
+      senderId
+    );
   };
 
-  const handleReply = (message: Message) => {
-    if (message.type === "system") return;
-    setReplyTarget(message);
-  };
+  const currentUserLabel = user ? resolveSenderName(user.id) : "";
 
-  const handleDelete = (id: number) => {
-    setMessages((prev) => {
-      if (!prev) return prev;
-      return prev.filter((msg) => msg.id !== id);
+  const formatTimestamp = (timestamp: string) =>
+    new Date(timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
     });
 
-    setReplyTarget((current) => (current?.id === id ? null : current));
+  const orderedMessages =
+    messages?.slice().sort((a, b) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    ) ?? [];
+
+  const handleSend = async (text: string) => {
+    if (!text.trim() || !user || !token || !convoId) return;
+
+    try {
+      setSendError(null);
+      setSending(true);
+      const created = await sendMessage(token, convoId, text.trim());
+      setMessages((prev) => (prev ? [...prev, created] : [created]));
+    } catch (err) {
+      setSendError(
+        err instanceof Error ? err.message : "Unable to send message.",
+      );
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -155,13 +123,14 @@ export default function ChatWindowPage() {
           <span>←</span>
           <span>Back</span>
         </button>
-        <span className="font-semibold">Conversation {convoId}</span>
+        <span className="font-semibold">
+          {conversation?.title || "Conversation"}
+        </span>
         <div />
       </header>
 
       <main className="flex-1 space-y-2 overflow-y-auto p-4">
-        {messages === null ? (
-          // loading skeleton
+        {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex space-x-2">
@@ -173,58 +142,41 @@ export default function ChatWindowPage() {
               </div>
             ))}
           </div>
-        ) : messages.length === 0 ? (
+        ) : error ? (
+          <div className="rounded border border-red-200 bg-red-50 p-3 text-red-700">
+            {error}
+          </div>
+        ) : orderedMessages.length === 0 ? (
           <div className="flex h-full items-center justify-center text-gray-500">
             No messages yet. Say hello 👋
           </div>
         ) : (
           <>
-            {messages.map((m) => (
+            {orderedMessages.map((m) => (
               <MessageBubble
                 key={m.id}
-                replyTo={m.replyTo}
-                text={m.text}
-                sender={m.sender}
-                currentUser={user?.username ?? user?.email ?? ""}
-                type={m.type}
-                timestamp={m.timestamp}
-                status={m.status}
-                onReply={
-                  m.type !== "system" ? () => handleReply(m) : undefined
-                }
-                onDelete={
-                  m.type !== "system" ? () => handleDelete(m.id) : undefined
-                }
-                isReplyTarget={replyTarget?.id === m.id}
+                text={m.content}
+                sender={resolveSenderName(m.senderId)}
+                currentUser={currentUserLabel}
+                timestamp={formatTimestamp(m.createdAt)}
               />
             ))}
-
-            {typing && (
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400"></div>
-                <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0.2s]"></div>
-                <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0.4s]"></div>
-                <span>Alice is typing…</span>
-              </div>
-            )}
           </>
         )}
         <div ref={bottomRef} />
       </main>
 
-      <ChatInput
-        onSend={(msg) => handleSend(msg)}
-        replyingTo={
-          replyTarget
-            ? {
-                id: replyTarget.id,
-                sender: replyTarget.sender,
-                text: replyTarget.text,
-              }
-            : null
-        }
-        onCancelReply={() => setReplyTarget(null)}
-      />
+      <div className="border-t">
+        {sendError && (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            {sendError}
+          </div>
+        )}
+        <ChatInput onSend={handleSend} replyingTo={null} onCancelReply={() => null} />
+        {sending && (
+          <div className="px-4 pb-2 text-xs text-gray-500">Sending…</div>
+        )}
+      </div>
 
     </div>
   );

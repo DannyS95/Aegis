@@ -1,7 +1,7 @@
 import React from "react";
 
 type ReplyPreview = {
-  id: number;
+  id: string;
   sender: string;
   text: string;
 };

@@ -13,15 +13,17 @@ Welcome to the NestJS service that powers the Aegis chat system. Even if you hav
 
 2. **Bootstrap the environment**
    ```bash
-   cp backend/.env.example backend/.env
-   make generate-jwt-keys   # create RSA keys and store them in .env
-   make stack-up            # start proxy + backend + Postgres + Redis in one go
-   make generate            # generate Prisma client inside the container
-   make migrate-deploy      # apply pending Prisma migrations
-   make seed                # populate dev users (alice, bob, charlie)
-                            # plus an admin super-user (admin@…)
+   make bootstrap           # one-shot setup (env + keys + stack + prisma + migrations + seed)
    make up service=adminer  # (optional) launch Adminer at http://localhost:8080
    make logs                # tail backend logs (Ctrl+C to stop)
+   ```
+
+   If you prefer explicit steps instead of one-shot bootstrap:
+   ```bash
+   cp backend/.env.example backend/.env
+   make keys
+   make stack-up
+   make db-prepare
    ```
 
    > Adminer connects to the same Postgres instance (default credentials `aegis` / `aegis`). Start it only when you need a browser UI on http://localhost:8080.
@@ -102,7 +104,7 @@ Following this flow keeps the codebase aligned with our DDD-lite structure while
 ## 3. How Authentication Works
 
 1. **Key material**
-   - `make generate-jwt-keys` uses OpenSSL to generate an RSA keypair.
+   - `make keys` (alias: `make generate-jwt-keys`) uses OpenSSL to generate an RSA keypair.
    - Keys are written into `.env` as escaped strings (`JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`).
    - `JwtKeyProvider` (in `security/jwt`) loads the PEMs once at boot so both token issuance and guards reuse the same material.
    - `make restart` reloads the environment so Nest picks up the new values.
@@ -148,18 +150,21 @@ Following this flow keeps the codebase aligned with our DDD-lite structure while
 | --- | --- |
 | `make stack-up` | Start proxy + backend + Postgres + Redis with one command |
 | `make stack-down` | Stop the entire stack (proxy, backend, Postgres, Redis) |
+| `make bootstrap` | One-shot first run: create env, generate JWT keys, start stack, generate Prisma client, run migrations, seed users |
 | `make up` | Start only the selected service (defaults to backend) |
-| `make down` | Stop only the selected service |
+| `make down` | Stop only the selected service (defaults to backend) |
 | `make restart` | Restart the selected service (defaults to backend) |
 | `make logs service=backend` | Stream Docker logs for a service |
 | `make exec cmd="bash"` | Open a shell inside the backend container |
+| `make shell` | Open `sh` inside the selected service container |
 | `make migrate name=create_users` | Run `prisma migrate dev` inside Docker |
 | `make generate` | Run `prisma generate` inside the backend container |
 | `make migrate-deploy` | Apply all pending migrations in the current database |
 | `make seed` | Run `prisma db seed` to populate dev users |
-| `make generate-jwt-keys` | Generate RSA keys and update `.env` |
+| `make keys` | Generate RSA keys and update `.env` |
+| `make ps` | Show compose service status |
 
-Behind the scenes the backend container runs `npm run start:dev`, so code changes refresh automatically.
+Behind the scenes the backend container runs `./scripts/dev-entrypoint.sh`, which installs deps when lockfile changes, runs Prisma generate, and starts Nest in watch/debug mode.
 
 ---
 
@@ -178,7 +183,7 @@ Behind the scenes the backend container runs `npm run start:dev`, so code change
 | `JWT_PRIVATE_KEY` | RSA private key (escaped PEM) |
 | `JWT_PUBLIC_KEY` | RSA public key (escaped PEM) |
 
-You can regenerate keys anytime with `make generate-jwt-keys`; just remember to restart the backend afterwards.
+You can regenerate keys anytime with `make keys force=1`; just remember to restart the backend afterwards.
 
 ---
 

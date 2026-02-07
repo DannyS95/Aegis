@@ -1,5 +1,7 @@
-import { IsArray, IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ALLOWED_ROLES } from '../constants/auth.constants';
+import type { AllowedRole } from '../constants/auth.constants';
 
 export class LoginDto {
   @IsOptional()
@@ -29,6 +31,6 @@ export class LoginDto {
   scope?: string[];
 
   @IsOptional()
-  @IsString()
-  role?: string;
+  @IsIn(ALLOWED_ROLES)
+  role?: AllowedRole;
 }

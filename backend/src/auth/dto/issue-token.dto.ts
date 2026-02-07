@@ -1,5 +1,15 @@
-import { IsArray, IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ALLOWED_ROLES } from '../constants/auth.constants';
+import type { AllowedRole } from '../constants/auth.constants';
 
 export class IssueTokenDto {
   @IsOptional()
@@ -21,8 +31,8 @@ export class IssueTokenDto {
   scope?: string[];
 
   @IsOptional()
-  @IsString()
-  role?: string;
+  @IsIn(ALLOWED_ROLES)
+  role?: AllowedRole;
 
   @IsOptional()
   @IsObject()
