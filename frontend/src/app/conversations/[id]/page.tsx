@@ -12,7 +12,7 @@ import {
   getConversation,
   getMessages,
   sendMessage,
-} from "@/api/conversationsApi";
+} from "@/clients/conversationsClient";
 
 export default function ChatWindowPage() {
   const [conversation, setConversation] = useState<Conversation | null>(null);

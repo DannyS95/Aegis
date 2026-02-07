@@ -9,13 +9,13 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { ApiError } from "@/api/apiClient";
+import { ApiError } from "@/clients/httpClient";
 import {
   getCurrentUser,
   login as loginRequest,
   logout as logoutRequest,
   type LoginRequest,
-} from "@/api/authApi";
+} from "@/clients/authClient";
 
 export type User = {
   id: string;

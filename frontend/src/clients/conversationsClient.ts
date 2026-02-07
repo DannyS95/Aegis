@@ -1,4 +1,4 @@
-import { apiFetch } from "@/api/apiClient";
+import { apiFetch } from "@/clients/httpClient";
 
 export type ConversationParticipant = {
   user: {

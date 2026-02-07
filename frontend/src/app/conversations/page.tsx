@@ -8,7 +8,7 @@ import { useRequireAuthRedirect } from "@/hooks/useRequireAuthRedirect";
 import {
   type Conversation,
   getConversations,
-} from "@/api/conversationsApi";
+} from "@/clients/conversationsClient";
 
 export default function ConversationsListPage() {
   const router = useRouter();
