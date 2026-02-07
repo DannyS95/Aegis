@@ -4,27 +4,33 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
+import { useRequireAuthRedirect } from "@/hooks/useRequireAuthRedirect";
 import {
   type Conversation,
   getConversations,
-} from "@/lib/conversationsApi";
+} from "@/api/conversationsApi";
 
 export default function ConversationsListPage() {
   const router = useRouter();
-  const { user, token } = useUser();
+  const { user, loading, logout } = useUser();
   const [conversations, setConversations] = useState<Conversation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useRequireAuthRedirect(user, loading);
+
   useEffect(() => {
-    if (!user || !token) {
-      router.replace("/login");
+    if (loading) {
+      return;
+    }
+
+    if (!user) {
       return;
     }
 
     const load = async () => {
       try {
         setError(null);
-        const result = await getConversations(token);
+        const result = await getConversations();
         setConversations(result.items);
       } catch (err) {
         setError(
@@ -35,13 +41,28 @@ export default function ConversationsListPage() {
     };
 
     load();
-  }, [router, token, user]);
+  }, [loading, user]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login");
+  };
 
   return (
     <div className="mx-auto max-w-md p-4">
       <h1 className="mb-4 text-2xl font-bold">Conversations</h1>
 
-      {!user || !token ? (
+      <div className="mb-4 flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
+        >
+          Logout
+        </button>
+      </div>
+
+      {loading || !user ? (
         <div className="text-gray-600">Redirecting to login…</div>
       ) : conversations === null ? (
         // skeleton loader

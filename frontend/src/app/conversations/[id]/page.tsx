@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import MessageBubble from "@/components/MessageBubble";
 import { useUser } from "@/context/UserContext";
 import ChatInput from "@/components/ChatInput";
+import { useRequireAuthRedirect } from "@/hooks/useRequireAuthRedirect";
 import {
   type Conversation,
   type Message,
   getConversation,
   getMessages,
   sendMessage,
-} from "@/lib/conversationsApi";
+} from "@/api/conversationsApi";
 
 export default function ChatWindowPage() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -20,7 +21,7 @@ export default function ChatWindowPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const { user, token } = useUser();
+  const { user, loading: authLoading, logout } = useUser();
 
   const params = useParams();
   const router = useRouter();
@@ -33,14 +34,10 @@ export default function ChatWindowPage() {
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!user || !token) {
-      router.replace("/login");
-    }
-  }, [router, token, user]);
+  useRequireAuthRedirect(user, authLoading);
 
   useEffect(() => {
-    if (!user || !token || !convoId) {
+    if (authLoading || !user || !convoId) {
       return;
     }
 
@@ -49,8 +46,8 @@ export default function ChatWindowPage() {
         setError(null);
         setLoading(true);
         const [conversationResponse, messagesResponse] = await Promise.all([
-          getConversation(token, convoId),
-          getMessages(token, convoId),
+          getConversation(convoId),
+          getMessages(convoId),
         ]);
 
         setConversation(conversationResponse);
@@ -66,7 +63,7 @@ export default function ChatWindowPage() {
     };
 
     load();
-  }, [convoId, token, user]);
+  }, [authLoading, convoId, user]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -97,12 +94,12 @@ export default function ChatWindowPage() {
     ) ?? [];
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || !user || !token || !convoId) return;
+    if (!text.trim() || !user || !convoId) return;
 
     try {
       setSendError(null);
       setSending(true);
-      const created = await sendMessage(token, convoId, text.trim());
+      const created = await sendMessage(convoId, text.trim());
       setMessages((prev) => (prev ? [...prev, created] : [created]));
     } catch (err) {
       setSendError(
@@ -126,7 +123,16 @@ export default function ChatWindowPage() {
         <span className="font-semibold">
           {conversation?.title || "Conversation"}
         </span>
-        <div />
+        <button
+          type="button"
+          onClick={async () => {
+            await logout();
+            router.replace("/login");
+          }}
+          className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
+        >
+          Logout
+        </button>
       </header>
 
       <main className="flex-1 space-y-2 overflow-y-auto p-4">

@@ -48,7 +48,8 @@ describe('JwtAuthGuard', () => {
     });
 
     const request: AuthenticatedRequest = {
-      headers: { authorization: `Bearer ${token}` },
+      cookies: { aegis_auth: token },
+      headers: {},
     } as unknown as AuthenticatedRequest;
 
     await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
@@ -61,7 +62,7 @@ describe('JwtAuthGuard', () => {
   });
 
   it('proves the guard rejects requests without an authorization header', async () => {
-    const request = { headers: {} } as AuthenticatedRequest;
+    const request = { headers: {}, cookies: {} } as AuthenticatedRequest;
 
     await expect(
       guard.canActivate(createContext(request)),
@@ -70,7 +71,8 @@ describe('JwtAuthGuard', () => {
 
   it('proves the guard rejects requests with invalid tokens', async () => {
     const request = {
-      headers: { authorization: 'Bearer invalid.token.value' },
+      headers: {},
+      cookies: { aegis_auth: 'invalid.token.value' },
     } as AuthenticatedRequest;
 
     await expect(

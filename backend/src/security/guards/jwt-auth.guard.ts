@@ -7,6 +7,7 @@ import {
 import type { Request } from 'express';
 import { jwtVerify } from 'jose';
 import { JwtKeyProvider } from '../jwt/jwt-key.provider';
+import { AUTH_COOKIE_NAME } from '../../auth/constants/auth-cookie.constants';
 
 export interface AuthenticatedUser {
   id: string;
@@ -67,9 +68,14 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractBearerToken(request: Request): string {
+    const cookieToken = request.cookies?.[AUTH_COOKIE_NAME];
+    if (typeof cookieToken === 'string' && cookieToken.trim()) {
+      return cookieToken;
+    }
+
     const header = request.headers.authorization;
     if (!header) {
-      throw new UnauthorizedException('Authorization header required');
+      throw new UnauthorizedException('Authentication token required');
     }
 
     const [scheme, token] = header.split(' ');

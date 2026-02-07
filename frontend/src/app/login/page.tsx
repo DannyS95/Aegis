@@ -1,83 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-
-type TokenResponse = {
-  accessToken: string;
-  tokenType: string;
-  expiresIn: number;
-};
-
-type CurrentUserResponse = {
-  id: string;
-  username: string;
-  email: string;
-  avatarUrl?: string | null;
-};
-
 export default function LoginPage() {
-  const [identifier, setIdentifier] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { setAuthState } = useUser();
+  const { login, user, loading: userLoading } = useUser();
+
+  useEffect(() => {
+    if (!userLoading && user) {
+      router.replace("/conversations");
+    }
+  }, [router, user, userLoading]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!identifier.trim()) {
-      setError("Enter a username or email to continue.");
+    if (!username.trim()) {
+      setError("Enter a username to continue.");
       return;
     }
 
-    setLoading(true); 
+    setLoading(true);
     setError(null);
 
     try {
-      const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          identifier.includes("@")
-            ? { email: identifier.trim().toLowerCase() }
-            : { username: identifier.trim(), password: password || undefined },
-        ),
+      await login({
+        username: username.trim(),
+        password: password || undefined,
       });
-
-      if (!loginResponse.ok) {
-        throw new Error("Invalid credentials");
-      }
-
-      const token: TokenResponse = await loginResponse.json();
-
-      const meResponse = await fetch(`${API_BASE_URL}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${token.accessToken}`,
-        },
-      });
-
-      if (!meResponse.ok) {
-        throw new Error("Unable to load user profile");
-      }
-
-      const currentUser: CurrentUserResponse = await meResponse.json();
-
-      setAuthState(
-        {
-          id: currentUser.id,
-          username: currentUser.username,
-          email: currentUser.email,
-          avatarUrl: currentUser.avatarUrl,
-        },
-        token.accessToken,
-      );
 
       router.push("/conversations");
     } catch (err) {
@@ -103,9 +58,9 @@ export default function LoginPage() {
         </div>
         <input
           type="text"
-          placeholder="Username or email"
-          value={identifier}
-          onChange={(event) => setIdentifier(event.target.value)}
+          placeholder="Username"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
           className="w-full rounded-lg border border-gray-700 bg-gray-950/70 px-3 py-2 text-gray-100 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
           autoComplete="username"
         />
