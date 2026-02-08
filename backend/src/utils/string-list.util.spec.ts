@@ -2,7 +2,14 @@ import { filterForValidStrings } from './string-list.util';
 
 describe('filterForValidStrings', () => {
   it('trims whitespace and removes empty entries', () => {
-    const result = filterForValidStrings(['  alpha ', ' ', '', '\tbeta\t', null, undefined]);
+    const result = filterForValidStrings([
+      '  alpha ',
+      ' ',
+      '',
+      '\tbeta\t',
+      null,
+      undefined,
+    ]);
     expect(result).toEqual(['alpha', 'beta']);
   });
 

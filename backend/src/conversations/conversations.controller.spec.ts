@@ -39,6 +39,7 @@ describe('ConversationsController', () => {
       removeParticipant: jest.fn(),
       sendMessage: jest.fn(),
       listMessages: jest.fn(),
+      toggleReaction: jest.fn(),
     } as unknown as jest.Mocked<ConversationsService>;
 
     controller = new ConversationsController(service);
@@ -49,7 +50,10 @@ describe('ConversationsController', () => {
 
     it('throws when no authenticated user is provided', () => {
       expect(() =>
-        controller.createConversation(undefined as unknown as AuthenticatedUser, payload),
+        controller.createConversation(
+          undefined as unknown as AuthenticatedUser,
+          payload,
+        ),
       ).toThrow(MissingUserContextException);
     });
 
@@ -67,7 +71,10 @@ describe('ConversationsController', () => {
   describe('listConversations', () => {
     it('throws when user context is missing', () => {
       expect(() =>
-        controller.listConversations(undefined as unknown as AuthenticatedUser, {}),
+        controller.listConversations(
+          undefined as unknown as AuthenticatedUser,
+          {},
+        ),
       ).toThrow(MissingUserContextException);
     });
 
@@ -89,7 +96,10 @@ describe('ConversationsController', () => {
   describe('getConversation', () => {
     it('throws when user context is missing', () => {
       expect(() =>
-        controller.getConversation('conversation-1', undefined as unknown as AuthenticatedUser),
+        controller.getConversation(
+          'conversation-1',
+          undefined as unknown as AuthenticatedUser,
+        ),
       ).toThrow(MissingUserContextException);
     });
 
@@ -97,9 +107,15 @@ describe('ConversationsController', () => {
       const response = sampleConversation();
       service.getConversationById.mockResolvedValue(response);
 
-      const result = await controller.getConversation('conversation-1234', user);
+      const result = await controller.getConversation(
+        'conversation-1234',
+        user,
+      );
 
-      expect(service.getConversationById).toHaveBeenCalledWith('conversation-1234', user.id);
+      expect(service.getConversationById).toHaveBeenCalledWith(
+        'conversation-1234',
+        user.id,
+      );
       expect(result).toBe(response);
     });
   });
@@ -109,7 +125,11 @@ describe('ConversationsController', () => {
 
     it('throws when user context is missing', () => {
       expect(() =>
-        controller.addParticipants('conversation-1', undefined as unknown as AuthenticatedUser, body),
+        controller.addParticipants(
+          'conversation-1',
+          undefined as unknown as AuthenticatedUser,
+          body,
+        ),
       ).toThrow(MissingUserContextException);
     });
 
@@ -117,7 +137,11 @@ describe('ConversationsController', () => {
       const response = sampleConversation();
       service.addParticipants.mockResolvedValue(response);
 
-      const result = await controller.addParticipants('conversation-1', user, body);
+      const result = await controller.addParticipants(
+        'conversation-1',
+        user,
+        body,
+      );
 
       expect(service.addParticipants).toHaveBeenCalledWith(
         'conversation-1',
@@ -143,9 +167,17 @@ describe('ConversationsController', () => {
       const response = sampleConversation();
       service.removeParticipant.mockResolvedValue(response);
 
-      const result = await controller.removeParticipant('conversation-1', 'user-456', user);
+      const result = await controller.removeParticipant(
+        'conversation-1',
+        'user-456',
+        user,
+      );
 
-      expect(service.removeParticipant).toHaveBeenCalledWith('conversation-1', user.id, 'user-456');
+      expect(service.removeParticipant).toHaveBeenCalledWith(
+        'conversation-1',
+        user.id,
+        'user-456',
+      );
       expect(result).toBe(response);
     });
   });
@@ -155,7 +187,11 @@ describe('ConversationsController', () => {
 
     it('throws when user context is missing', () => {
       expect(() =>
-        controller.sendMessage('conversation-1', undefined as unknown as AuthenticatedUser, body),
+        controller.sendMessage(
+          'conversation-1',
+          undefined as unknown as AuthenticatedUser,
+          body,
+        ),
       ).toThrow(MissingUserContextException);
     });
 
@@ -163,9 +199,17 @@ describe('ConversationsController', () => {
       const response = { id: 'msg-1' };
       service.sendMessage.mockResolvedValue(response as any);
 
-      const result = await controller.sendMessage('conversation-1', user, body as any);
+      const result = await controller.sendMessage(
+        'conversation-1',
+        user,
+        body as any,
+      );
 
-      expect(service.sendMessage).toHaveBeenCalledWith('conversation-1', user.id, body as any);
+      expect(service.sendMessage).toHaveBeenCalledWith(
+        'conversation-1',
+        user.id,
+        body as any,
+      );
       expect(result).toBe(response);
     });
   });
@@ -173,7 +217,11 @@ describe('ConversationsController', () => {
   describe('listMessages', () => {
     it('throws when user context is missing', () => {
       expect(() =>
-        controller.listMessages('conversation-1', undefined as unknown as AuthenticatedUser, {}),
+        controller.listMessages(
+          'conversation-1',
+          undefined as unknown as AuthenticatedUser,
+          {},
+        ),
       ).toThrow(MissingUserContextException);
     });
 
@@ -181,9 +229,15 @@ describe('ConversationsController', () => {
       const response = { items: [], nextCursor: null };
       service.listMessages.mockResolvedValue(response as any);
 
-      const result = await controller.listMessages('conversation-1', user, { take: 10 });
+      const result = await controller.listMessages('conversation-1', user, {
+        take: 10,
+      });
 
-      expect(service.listMessages).toHaveBeenCalledWith('conversation-1', user.id, { take: 10 });
+      expect(service.listMessages).toHaveBeenCalledWith(
+        'conversation-1',
+        user.id,
+        { take: 10 },
+      );
       expect(result).toBe(response);
     });
   });

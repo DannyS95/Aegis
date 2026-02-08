@@ -19,7 +19,10 @@ export class IssueTokenDto {
   @IsOptional()
   @Transform(({ value }) => {
     if (typeof value === 'string') {
-      return value.split(' ').map((item) => item.trim()).filter(Boolean);
+      return value
+        .split(' ')
+        .map((item) => item.trim())
+        .filter(Boolean);
     }
     if (Array.isArray(value)) {
       return value;

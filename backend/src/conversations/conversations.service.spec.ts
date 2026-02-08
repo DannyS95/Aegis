@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
 import { ConversationNotFoundException } from '../common/exceptions/conversation-not-found.exception';
@@ -40,6 +41,12 @@ describe('ConversationsService', () => {
       },
       message: {
         create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      messageReaction: {
+        create: jest.fn(),
+        deleteMany: jest.fn(),
         findMany: jest.fn(),
       },
       participant: {
@@ -129,7 +136,9 @@ describe('ConversationsService', () => {
         }),
       );
       expect(response.isGroup).toBe(true);
-      expect(response.participants.find((p) => p.user.id === creatorId)?.role).toBe('owner');
+      expect(
+        response.participants.find((p) => p.user.id === creatorId)?.role,
+      ).toBe('owner');
     });
 
     it('creates a direct conversation when no duplicate exists', async () => {
@@ -146,7 +155,10 @@ describe('ConversationsService', () => {
         lastMessageId: null,
         createdAt: new Date('2024-01-01T00:00:00.000Z'),
         updatedAt: new Date('2024-01-01T00:00:00.000Z'),
-        participants: [sampleParticipant(creatorId), sampleParticipant(otherUserId)],
+        participants: [
+          sampleParticipant(creatorId),
+          sampleParticipant(otherUserId),
+        ],
       };
 
       prisma.conversation.create.mockResolvedValue(conversationRecord);
@@ -192,7 +204,10 @@ describe('ConversationsService', () => {
         lastMessageId: 'message-9',
         createdAt: new Date('2024-01-01T00:00:00.000Z'),
         updatedAt: new Date('2024-01-01T00:00:00.000Z'),
-        participants: [sampleParticipant(creatorId), sampleParticipant(otherUserId)],
+        participants: [
+          sampleParticipant(creatorId),
+          sampleParticipant(otherUserId),
+        ],
       };
 
       prisma.conversation.findMany.mockResolvedValue([record]);
@@ -237,12 +252,18 @@ describe('ConversationsService', () => {
         lastMessageId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        participants: [sampleParticipant(creatorId), sampleParticipant(otherUserId)],
+        participants: [
+          sampleParticipant(creatorId),
+          sampleParticipant(otherUserId),
+        ],
       };
 
       prisma.conversation.findUnique.mockResolvedValue(record);
 
-      const result = await service.getConversationById('conversation-1', creatorId);
+      const result = await service.getConversationById(
+        'conversation-1',
+        creatorId,
+      );
 
       expect(result.id).toBe(record.id);
       expect(result.participants).toHaveLength(2);
@@ -280,13 +301,21 @@ describe('ConversationsService', () => {
       usersService.findManyByIds.mockResolvedValue([{ id: 'user-3' }]);
       prisma.participant.createMany.mockResolvedValue({ count: 1 });
 
-      const result = await service.addParticipants('conversation-1', creatorId, [
-        'user-3',
-      ]);
+      const result = await service.addParticipants(
+        'conversation-1',
+        creatorId,
+        ['user-3'],
+      );
 
       expect(prisma.participant.createMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: [{ userId: 'user-3', conversationId: 'conversation-1', role: 'member' }],
+          data: [
+            {
+              userId: 'user-3',
+              conversationId: 'conversation-1',
+              role: 'member',
+            },
+          ],
         }),
       );
       expect(prisma.conversation.update).toHaveBeenCalledWith({
@@ -315,8 +344,14 @@ describe('ConversationsService', () => {
       updatedAt: new Date(),
       participants: [
         { ...sampleParticipant(creatorId), role: 'owner' },
-        { ...sampleParticipant(otherUserId), joinedAt: new Date('2024-02-01T00:00:00.000Z') },
-        { ...sampleParticipant('user-3'), joinedAt: new Date('2024-03-01T00:00:00.000Z') },
+        {
+          ...sampleParticipant(otherUserId),
+          joinedAt: new Date('2024-02-01T00:00:00.000Z'),
+        },
+        {
+          ...sampleParticipant('user-3'),
+          joinedAt: new Date('2024-03-01T00:00:00.000Z'),
+        },
       ],
     };
 
@@ -334,7 +369,11 @@ describe('ConversationsService', () => {
       prisma.participant.delete.mockResolvedValue(undefined);
       prisma.participant.update.mockResolvedValue(undefined);
 
-      const result = await service.removeParticipant('conversation-1', creatorId, 'user-3');
+      const result = await service.removeParticipant(
+        'conversation-1',
+        creatorId,
+        'user-3',
+      );
 
       expect(prisma.participant.delete).toHaveBeenCalledWith({
         where: {
@@ -372,7 +411,11 @@ describe('ConversationsService', () => {
       prisma.participant.delete.mockResolvedValue(undefined);
       prisma.participant.update.mockResolvedValue(undefined);
 
-      const result = await service.removeParticipant('conversation-1', creatorId, creatorId);
+      const result = await service.removeParticipant(
+        'conversation-1',
+        creatorId,
+        creatorId,
+      );
 
       expect(prisma.participant.update).toHaveBeenCalledWith({
         where: {
@@ -387,7 +430,9 @@ describe('ConversationsService', () => {
         where: { id: 'conversation-1' },
         data: expect.objectContaining({ updatedAt: expect.any(Date) }),
       });
-      expect(result.participants.find((p) => p.user.id === otherUserId)?.role).toBe('owner');
+      expect(
+        result.participants.find((p) => p.user.id === otherUserId)?.role,
+      ).toBe('owner');
     });
 
     it('prevents members from removing others', async () => {
@@ -437,7 +482,9 @@ describe('ConversationsService', () => {
       prisma.message.create.mockResolvedValue(messageRecord);
       prisma.conversation.update.mockResolvedValue(undefined);
 
-      const result = await service.sendMessage(conversationId, creatorId, { content: ' hello ' });
+      const result = await service.sendMessage(conversationId, creatorId, {
+        content: ' hello ',
+      });
 
       expect(prisma.message.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -452,7 +499,10 @@ describe('ConversationsService', () => {
         where: { id: conversationId },
         data: { lastMessageId: messageRecord.id },
       });
-      expect(result).toEqual(messageRecord);
+      expect(result).toEqual({
+        ...messageRecord,
+        reactions: [],
+      });
     });
   });
 
@@ -465,6 +515,7 @@ describe('ConversationsService', () => {
       conversationId,
       createdAt: new Date(),
       readAt: null,
+      reactions: [{ emoji: '👍', userId: creatorId }],
     };
 
     it('throws when conversation is missing', async () => {
@@ -493,7 +544,9 @@ describe('ConversationsService', () => {
       });
       prisma.message.findMany.mockResolvedValue([messageRecord]);
 
-      const result = await service.listMessages(conversationId, creatorId, { take: 10 });
+      const result = await service.listMessages(conversationId, creatorId, {
+        take: 10,
+      });
 
       expect(prisma.message.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -502,7 +555,118 @@ describe('ConversationsService', () => {
           take: 11,
         }),
       );
-      expect(result).toEqual({ items: [messageRecord], nextCursor: null });
+      expect(result).toEqual({
+        items: [
+          {
+            id: 'msg-1',
+            content: 'hello',
+            senderId: creatorId,
+            conversationId,
+            createdAt: messageRecord.createdAt,
+            readAt: null,
+            reactions: [{ emoji: '👍', count: 1, reactedByCurrentUser: true }],
+          },
+        ],
+        nextCursor: null,
+      });
+    });
+  });
+
+  describe('toggleReaction', () => {
+    const messageId = 'message-1';
+    const emoji = '👍';
+
+    it('member can add reaction', async () => {
+      prisma.message.findUnique.mockResolvedValue({
+        id: messageId,
+        conversation: {
+          participants: [{ userId: creatorId }],
+        },
+      });
+      prisma.messageReaction.create.mockResolvedValue({
+        id: 'reaction-1',
+      });
+      prisma.messageReaction.findMany.mockResolvedValue([
+        { emoji, userId: creatorId },
+      ]);
+
+      const result = await service.toggleReaction(messageId, creatorId, emoji);
+
+      expect(prisma.messageReaction.create).toHaveBeenCalledWith({
+        data: {
+          messageId,
+          userId: creatorId,
+          emoji,
+        },
+      });
+      expect(result).toEqual({
+        action: 'added',
+        messageId,
+        emoji,
+        reactions: [{ emoji, count: 1, reactedByCurrentUser: true }],
+      });
+    });
+
+    it('member can remove the same reaction', async () => {
+      prisma.message.findUnique.mockResolvedValue({
+        id: messageId,
+        conversation: {
+          participants: [{ userId: creatorId }],
+        },
+      });
+      prisma.messageReaction.create.mockRejectedValue({ code: 'P2002' });
+      prisma.messageReaction.deleteMany.mockResolvedValue({ count: 1 });
+      prisma.messageReaction.findMany.mockResolvedValue([]);
+
+      const result = await service.toggleReaction(messageId, creatorId, emoji);
+
+      expect(prisma.messageReaction.deleteMany).toHaveBeenCalledWith({
+        where: {
+          messageId,
+          userId: creatorId,
+          emoji,
+        },
+      });
+      expect(result).toEqual({
+        action: 'removed',
+        messageId,
+        emoji,
+        reactions: [],
+      });
+    });
+
+    it('throws forbidden for non-members', async () => {
+      prisma.message.findUnique.mockResolvedValue({
+        id: messageId,
+        conversation: {
+          participants: [],
+        },
+      });
+
+      await expect(
+        service.toggleReaction(messageId, creatorId, emoji),
+      ).rejects.toBeInstanceOf(NotConversationParticipantException);
+    });
+
+    it('throws not found for missing message', async () => {
+      prisma.message.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.toggleReaction(messageId, creatorId, emoji),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws bad request for invalid emoji', async () => {
+      prisma.message.findUnique.mockResolvedValue({
+        id: messageId,
+        conversation: {
+          participants: [{ userId: creatorId }],
+        },
+      });
+
+      await expect(
+        service.toggleReaction(messageId, creatorId, '   '),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

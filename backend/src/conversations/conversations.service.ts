@@ -35,6 +35,12 @@ interface ConversationParticipantResponse {
   banned: boolean;
 }
 
+export interface MessageReactionResponse {
+  emoji: string;
+  count: number;
+  reactedByCurrentUser: boolean;
+}
+
 export interface ConversationResponse {
   id: string;
   title: string | null;
@@ -57,11 +63,19 @@ export interface MessageResponse {
   conversationId: string;
   createdAt: Date;
   readAt: Date | null;
+  reactions: MessageReactionResponse[];
 }
 
 export interface MessageListResponse {
   items: MessageResponse[];
   nextCursor: string | null;
+}
+
+export interface ToggleReactionResponse {
+  action: 'added' | 'removed';
+  messageId: string;
+  emoji: string;
+  reactions: MessageReactionResponse[];
 }
 
 const participantUserSelect = {
@@ -92,6 +106,30 @@ const messageSelect = {
   createdAt: true,
   readAt: true,
 } as const;
+
+const messageWithReactionsSelect = {
+  ...messageSelect,
+  reactions: {
+    select: {
+      emoji: true,
+      userId: true,
+    },
+  },
+} as const;
+
+type MessageRow = {
+  id: string;
+  content: string;
+  senderId: string;
+  conversationId: string;
+  createdAt: Date;
+  readAt: Date | null;
+};
+
+type ReactionRow = {
+  emoji: string;
+  userId: string;
+};
 
 interface ConversationWithParticipants {
   id: string;
@@ -128,10 +166,15 @@ export class ConversationsService {
     creatorId: string,
     dto: CreateConversationDto,
   ): Promise<ConversationResponse> {
-    const participantIds = this.normaliseParticipantIds(dto.participants, creatorId);
+    const participantIds = this.normaliseParticipantIds(
+      dto.participants,
+      creatorId,
+    );
 
     if (participantIds.length < 2) {
-      throw new BadRequestException('A conversation requires at least two participants.');
+      throw new BadRequestException(
+        'A conversation requires at least two participants.',
+      );
     }
 
     const isGroupConversation = dto.isGroup ?? participantIds.length > 2;
@@ -220,7 +263,9 @@ export class ConversationsService {
     );
 
     if (!isParticipant) {
-      throw new ForbiddenException('You do not have access to this conversation.');
+      throw new ForbiddenException(
+        'You do not have access to this conversation.',
+      );
     }
 
     return this.mapConversation(conversation);
@@ -240,7 +285,10 @@ export class ConversationsService {
       conversationId,
       requesterId,
       'Cannot add participants to a direct conversation.',
-      { requireOwner: true, ownerErrorMessage: 'Only owners can add participants.' },
+      {
+        requireOwner: true,
+        ownerErrorMessage: 'Only owners can add participants.',
+      },
     );
 
     const existingIds = new Set(
@@ -277,11 +325,12 @@ export class ConversationsService {
     requesterId: string,
     participantId: string,
   ): Promise<ConversationResponse> {
-    const { conversation, requester } = await this.loadGroupConversationForAction(
-      conversationId,
-      requesterId,
-      'Cannot remove participants from a direct conversation.',
-    );
+    const { conversation, requester } =
+      await this.loadGroupConversationForAction(
+        conversationId,
+        requesterId,
+        'Cannot remove participants from a direct conversation.',
+      );
 
     const target = conversation.participants.find(
       (participant) => participant.userId === participantId,
@@ -294,12 +343,15 @@ export class ConversationsService {
     const removingSelf = participantId === requesterId;
 
     if (!removingSelf && requester.role !== 'owner') {
-      throw new ForbiddenException('Only owners can remove other participants.');
+      throw new ForbiddenException(
+        'Only owners can remove other participants.',
+      );
     }
 
-    const promoteUserId = target.role === 'owner'
-      ? this.resolveNextOwner(conversation.participants, participantId)
-      : null;
+    const promoteUserId =
+      target.role === 'owner'
+        ? this.resolveNextOwner(conversation.participants, participantId)
+        : null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.participant.delete({
@@ -376,7 +428,10 @@ export class ConversationsService {
       return created;
     });
 
-    return message;
+    return {
+      ...message,
+      reactions: [],
+    };
   }
 
   async listMessages(
@@ -411,15 +466,86 @@ export class ConversationsService {
       take: limit + 1,
       skip: query.cursor ? 1 : 0,
       cursor: query.cursor ? { id: query.cursor } : undefined,
-      select: messageSelect,
+      select: messageWithReactionsSelect,
     });
 
     const hasMore = messages.length > limit;
     const items = hasMore ? messages.slice(0, limit) : messages;
 
     return {
-      items,
+      items: items.map((message) => this.mapMessage(message, userId)),
       nextCursor: hasMore ? messages[limit].id : null,
+    };
+  }
+
+  async toggleReaction(
+    messageId: string,
+    userId: string,
+    emoji: string,
+  ): Promise<ToggleReactionResponse> {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: {
+        id: true,
+        conversation: {
+          select: {
+            participants: {
+              where: { userId },
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Message not found.');
+    }
+
+    if (!message.conversation.participants.length) {
+      throw new NotConversationParticipantException();
+    }
+
+    const normalisedEmoji = this.normaliseEmoji(emoji);
+    let action: ToggleReactionResponse['action'] = 'added';
+
+    try {
+      await this.prisma.messageReaction.create({
+        data: {
+          messageId,
+          userId,
+          emoji: normalisedEmoji,
+        },
+      });
+    } catch (error) {
+      if (!this.isUniqueConstraintViolation(error)) {
+        throw error;
+      }
+
+      await this.prisma.messageReaction.deleteMany({
+        where: {
+          messageId,
+          userId,
+          emoji: normalisedEmoji,
+        },
+      });
+
+      action = 'removed';
+    }
+
+    const reactions = await this.prisma.messageReaction.findMany({
+      where: { messageId },
+      select: {
+        emoji: true,
+        userId: true,
+      },
+    });
+
+    return {
+      action,
+      messageId,
+      emoji: normalisedEmoji,
+      reactions: this.mapReactions(reactions, userId),
     };
   }
 
@@ -445,10 +571,7 @@ export class ConversationsService {
       },
     });
 
-    if (
-      existing &&
-      existing.participants.length === participantIds.length
-    ) {
+    if (existing && existing.participants.length === participantIds.length) {
       throw new ConflictException(
         'A direct conversation between these users already exists.',
       );
@@ -479,6 +602,55 @@ export class ConversationsService {
         banned: participant.banned,
       })),
     };
+  }
+
+  private mapMessage(
+    message: MessageRow & { reactions: ReactionRow[] },
+    currentUserId: string,
+  ): MessageResponse {
+    return {
+      id: message.id,
+      content: message.content,
+      senderId: message.senderId,
+      conversationId: message.conversationId,
+      createdAt: message.createdAt,
+      readAt: message.readAt,
+      reactions: this.mapReactions(message.reactions, currentUserId),
+    };
+  }
+
+  private mapReactions(
+    reactions: ReactionRow[],
+    currentUserId: string,
+  ): MessageReactionResponse[] {
+    const grouped = new Map<
+      string,
+      { count: number; reactedByCurrentUser: boolean }
+    >();
+
+    for (const reaction of reactions) {
+      const current = grouped.get(reaction.emoji);
+      if (current) {
+        current.count += 1;
+        if (reaction.userId === currentUserId) {
+          current.reactedByCurrentUser = true;
+        }
+        continue;
+      }
+
+      grouped.set(reaction.emoji, {
+        count: 1,
+        reactedByCurrentUser: reaction.userId === currentUserId,
+      });
+    }
+
+    return Array.from(grouped.entries())
+      .map(([emoji, value]) => ({
+        emoji,
+        count: value.count,
+        reactedByCurrentUser: value.reactedByCurrentUser,
+      }))
+      .sort((a, b) => a.emoji.localeCompare(b.emoji));
   }
 
   private normaliseParticipantIds(
@@ -557,7 +729,9 @@ export class ConversationsService {
 
     const users = await this.usersService.findManyByIds(userIds);
     if (users.length !== userIds.length) {
-      throw new NotFoundException('One or more participants could not be found.');
+      throw new NotFoundException(
+        'One or more participants could not be found.',
+      );
     }
   }
 
@@ -596,7 +770,9 @@ export class ConversationsService {
     );
 
     if (!requester) {
-      throw new ForbiddenException('You do not have access to this conversation.');
+      throw new ForbiddenException(
+        'You do not have access to this conversation.',
+      );
     }
 
     if (options.requireOwner && requester.role !== 'owner') {
@@ -646,5 +822,28 @@ export class ConversationsService {
     }
 
     return Math.min(Math.max(candidate, 1), 100);
+  }
+
+  private normaliseEmoji(emoji: string): string {
+    const value = emoji?.trim();
+
+    if (!value) {
+      throw new BadRequestException('Emoji is required.');
+    }
+
+    if (value.length > 32) {
+      throw new BadRequestException('Emoji must be at most 32 characters.');
+    }
+
+    return value;
+  }
+
+  private isUniqueConstraintViolation(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2002'
+    );
   }
 }

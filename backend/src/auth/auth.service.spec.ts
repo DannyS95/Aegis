@@ -1,7 +1,10 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService, TokenResponse, IssueTokenRequest } from './auth.service';
-import { JwtTokenService, JwtTokenPayload } from '../security/jwt/jwt-token.service';
+import {
+  JwtTokenService,
+  JwtTokenPayload,
+} from '../security/jwt/jwt-token.service';
 import { JwtKeyProvider } from '../security/jwt/jwt-key.provider';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -66,9 +69,8 @@ describe('AuthService', () => {
   ) => {
     expect(jwtTokenService.signAccessToken).toHaveBeenCalledTimes(1);
 
-    const [payloadArg, ttlArg] = (
-      jwtTokenService.signAccessToken as jest.Mock
-    ).mock.calls[0] as [JwtTokenPayload, number];
+    const [payloadArg, ttlArg] = (jwtTokenService.signAccessToken as jest.Mock)
+      .mock.calls[0] as [JwtTokenPayload, number];
 
     expect(payloadArg).toEqual(expect.objectContaining(payloadMatcher));
     expect(ttlArg).toBe(ttl);

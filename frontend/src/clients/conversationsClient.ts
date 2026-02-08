@@ -36,11 +36,25 @@ export type Message = {
   conversationId: string;
   createdAt: string;
   readAt: string | null;
+  reactions: MessageReaction[];
+};
+
+export type MessageReaction = {
+  emoji: string;
+  count: number;
+  reactedByCurrentUser: boolean;
 };
 
 export type MessageListResponse = {
   items: Message[];
   nextCursor: string | null;
+};
+
+export type ToggleReactionResponse = {
+  action: "added" | "removed";
+  messageId: string;
+  emoji: string;
+  reactions: MessageReaction[];
 };
 
 export async function getConversations(): Promise<ConversationListResponse> {
@@ -70,6 +84,19 @@ export async function sendMessage(conversationId: string, content: string): Prom
     {
       method: "POST",
       body: JSON.stringify({ content }),
+    },
+  );
+}
+
+export async function toggleReaction(
+  messageId: string,
+  emoji: string,
+): Promise<ToggleReactionResponse> {
+  return apiFetch<ToggleReactionResponse>(
+    `/messages/${encodeURIComponent(messageId)}/reactions`,
+    {
+      method: "POST",
+      body: JSON.stringify({ emoji }),
     },
   );
 }

@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Post, Body, Query, UseGuards, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  Delete,
+} from '@nestjs/common';
 import {
   ConversationsService,
   ConversationListResponse,
@@ -70,7 +79,11 @@ export class ConversationsController {
       throw new MissingUserContextException();
     }
 
-    return this.conversationsService.addParticipants(id, user.id, body.participantIds);
+    return this.conversationsService.addParticipants(
+      id,
+      user.id,
+      body.participantIds,
+    );
   }
 
   @Delete(':id/participants/:participantId')
@@ -83,7 +96,11 @@ export class ConversationsController {
       throw new MissingUserContextException();
     }
 
-    return this.conversationsService.removeParticipant(id, user.id, participantId);
+    return this.conversationsService.removeParticipant(
+      id,
+      user.id,
+      participantId,
+    );
   }
 
   @Post(':id/messages')

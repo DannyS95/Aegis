@@ -15,6 +15,7 @@ model User {
   role          String          @default("user")
   conversations Participant[]
   messages      Message[]
+  reactions     MessageReaction[]
   createdAt     DateTime        @default(now())
 
   // Implicit many-to-many: user blocking
@@ -56,17 +57,22 @@ model Message {
   conversationId String
   sender         User          @relation(fields: [senderId], references: [id])
   conversation   Conversation  @relation(fields: [conversationId], references: [id])
+  reactions      MessageReaction[]
   createdAt      DateTime      @default(now())
   readAt         DateTime?
-
-  // Implicit many-to-many: emoji reactions
-  emojis Emoji[]
 
   @@index([conversationId, createdAt(sort: Desc)])
 }
 
-model Emoji {
+model MessageReaction {
   id       String   @id @default(uuid())
-  name     String   @unique
-  messages Message[]
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }

@@ -27,9 +27,7 @@ export class AuthController {
 
   @HttpCode(200)
   @Post('token')
-  async issueToken(
-    @Body() body: IssueTokenDto,
-  ): Promise<TokenResponse> {
+  async issueToken(@Body() body: IssueTokenDto): Promise<TokenResponse> {
     return this.authService.issueToken(body);
   }
 

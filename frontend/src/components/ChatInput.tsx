@@ -29,7 +29,7 @@ export default function ChatInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-t p-3 space-y-2">
+    <form onSubmit={handleSubmit} className="space-y-2">
       {replyingTo && (
         <div className="flex items-start justify-between rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
           <div className="max-w-xs pr-3">
@@ -51,17 +51,23 @@ export default function ChatInput({
           )}
         </div>
       )}
-      <div className="flex space-x-2">
+      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <button
+          type="button"
+          className="rounded-xl border border-slate-200 px-2.5 py-1.5 text-lg text-slate-500"
+        >
+          😊
+        </button>
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message..."
-          className="flex-1 rounded border px-3 py-2"
+          className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-slate-700 outline-none focus:border-[#2b70db]"
         />
         <button
           type="submit"
-          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          className="rounded-xl bg-[#2b70db] px-5 py-2 font-bold text-white shadow-sm transition hover:bg-[#205fc2]"
         >
           Send
         </button>
