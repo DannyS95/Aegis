@@ -19,6 +19,7 @@ export type Conversation = {
   title: string | null;
   isGroup: boolean;
   lastMessageId: string | null;
+  lastMessagePreview?: string | null;
   createdAt: string;
   updatedAt: string;
   participants: ConversationParticipant[];

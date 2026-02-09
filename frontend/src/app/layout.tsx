@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-import { Nunito, Sora } from "next/font/google";
+import { Montserrat, Roboto } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const nunito = Nunito({
+const roboto = Roboto({
   subsets: ["latin"],
-  variable: "--font-nunito",
-  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-roboto",
+  weight: ["400", "500", "700"],
 });
 
-const sora = Sora({
+const montserrat = Montserrat({
   subsets: ["latin"],
-  variable: "--font-sora",
+  variable: "--font-montserrat",
   weight: ["500", "600", "700", "800"],
 });
 
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${nunito.variable} ${sora.variable} antialiased`}>
+      <body className={`${roboto.variable} ${montserrat.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

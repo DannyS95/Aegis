@@ -10,6 +10,7 @@ import { UsersService } from '../users/users.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationNotFoundException } from '../common/exceptions/conversation-not-found.exception';
 import { NotConversationParticipantException } from '../common/exceptions/not-conversation-participant.exception';
+import { ConversationTitleService } from './conversation-title.service';
 
 interface ListConversationsQuery {
   cursor?: string;
@@ -46,6 +47,7 @@ export interface ConversationResponse {
   title: string | null;
   isGroup: boolean;
   lastMessageId: string | null;
+  lastMessagePreview?: string | null;
   createdAt: Date;
   updatedAt: Date;
   participants: ConversationParticipantResponse[];
@@ -160,6 +162,7 @@ export class ConversationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
+    private readonly conversationTitleService: ConversationTitleService,
   ) {}
 
   async createConversation(
@@ -193,7 +196,7 @@ export class ConversationsService {
 
     const conversationRecord = await this.prisma.conversation.create({
       data: {
-        title: isGroupConversation ? this.normaliseTitle(dto.title) : null,
+        title: this.conversationTitleService.resolveTitle(dto.title),
         isGroup: isGroupConversation,
         participants: {
           create: participantIds.map((userId) => ({
@@ -236,10 +239,15 @@ export class ConversationsService {
     const paginatedConversations = hasMore
       ? conversations.slice(0, take)
       : conversations;
+    const lastMessagePreviewByConversationId =
+      await this.buildLastMessagePreviewMap(paginatedConversations);
 
     return {
       items: paginatedConversations.map((conversation) =>
-        this.mapConversation(conversation),
+        this.mapConversation(
+          conversation,
+          lastMessagePreviewByConversationId.get(conversation.id) ?? null,
+        ),
       ),
       nextCursor: hasMore ? conversations[take].id : null,
     };
@@ -268,7 +276,13 @@ export class ConversationsService {
       );
     }
 
-    return this.mapConversation(conversation);
+    const lastMessagePreviewByConversationId =
+      await this.buildLastMessagePreviewMap([conversation]);
+
+    return this.mapConversation(
+      conversation,
+      lastMessagePreviewByConversationId.get(conversation.id) ?? null,
+    );
   }
 
   async addParticipants(
@@ -580,12 +594,14 @@ export class ConversationsService {
 
   private mapConversation(
     conversation: ConversationWithParticipants,
+    lastMessagePreview: string | null = null,
   ): ConversationResponse {
     return {
       id: conversation.id,
       title: conversation.title ?? null,
       isGroup: conversation.isGroup,
       lastMessageId: conversation.lastMessageId ?? null,
+      lastMessagePreview,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       participants: conversation.participants.map((participant) => ({
@@ -684,15 +700,6 @@ export class ConversationsService {
     return ordered;
   }
 
-  private normaliseTitle(title?: string | null): string | null {
-    if (!title) {
-      return null;
-    }
-
-    const normalizedTitle = title.trim();
-    return normalizedTitle.length ? normalizedTitle : null;
-  }
-
   private resolveTake(candidate?: number): number {
     const defaultTake = 20;
 
@@ -720,6 +727,54 @@ export class ConversationsService {
     });
 
     return Array.from(unique);
+  }
+
+  private async buildLastMessagePreviewMap(
+    conversations: ConversationWithParticipants[],
+  ): Promise<Map<string, string | null>> {
+    const messageIds = Array.from(
+      new Set(
+        conversations
+          .map((conversation) => conversation.lastMessageId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const previewByConversationId = new Map<string, string | null>();
+
+    if (!messageIds.length) {
+      return previewByConversationId;
+    }
+
+    const messages = await this.prisma.message.findMany({
+      where: {
+        id: {
+          in: messageIds,
+        },
+      },
+      select: {
+        id: true,
+        content: true,
+      },
+    });
+
+    const messageById = new Map(messages.map((message) => [message.id, message]));
+
+    conversations.forEach((conversation) => {
+      const lastMessageId = conversation.lastMessageId;
+      if (!lastMessageId) {
+        previewByConversationId.set(conversation.id, null);
+        return;
+      }
+
+      const content = messageById.get(lastMessageId)?.content ?? null;
+      previewByConversationId.set(
+        conversation.id,
+        content ? content.replace(/\s+/g, ' ').trim() : null,
+      );
+    });
+
+    return previewByConversationId;
   }
 
   private async assertUsersExist(userIds: string[]) {

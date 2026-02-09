@@ -49,10 +49,8 @@ export default function MessageBubble({
 }: MessageBubbleProps) {
   if (type === "system") {
     return (
-      <div className="flex justify-center my-2">
-        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-          {text}
-        </span>
+      <div className="my-2 flex justify-center">
+        <span className="msg-system rounded px-2 py-1 text-xs">{text}</span>
       </div>
     );
   }
@@ -60,20 +58,6 @@ export default function MessageBubble({
   const isCurrentUser = sender === currentUser;
   const initial = sender.charAt(0).toUpperCase();
   const showActions = Boolean(onReply || onDelete);
-
-  const bubbleClasses = `max-w-xl rounded-2xl border px-4 py-3 shadow-sm ${
-    isCurrentUser
-      ? "border-blue-200 bg-blue-50/70 text-slate-900"
-      : "border-slate-200 bg-white text-slate-900"
-  } ${
-    isReplyTarget ? "ring-2 ring-blue-400 ring-offset-2 ring-offset-white" : ""
-  }`;
-
-  const replyPreviewClasses = `mb-2 rounded border-l-4 px-3 py-2 text-xs ${
-    isCurrentUser
-      ? "border-blue-300 bg-blue-500/20 text-white"
-      : "border-gray-300 bg-gray-100 text-gray-700"
-  }`;
 
   const getStatusSymbol = () => {
     switch (status) {
@@ -99,10 +83,8 @@ export default function MessageBubble({
         type="button"
         onClick={() => onToggleReaction?.(emoji)}
         disabled={reactionsDisabled || !onToggleReaction}
-        className={`rounded-full border px-2 py-0.5 text-xs transition ${
-          reactedByCurrentUser
-            ? "border-blue-400 bg-blue-50 text-blue-700"
-            : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+        className={`msg-reaction rounded-full px-2 py-0.5 text-xs transition ${
+          reactedByCurrentUser ? "msg-reaction-active" : ""
         } disabled:cursor-not-allowed disabled:opacity-60`}
       >
         {emoji} {count > 0 ? count : ""}
@@ -112,20 +94,20 @@ export default function MessageBubble({
 
   return (
     <div
-      className={`group relative flex items-start space-x-2 ${
+      className={`group relative flex w-full items-center gap-2.5 ${
         isCurrentUser ? "justify-end" : "justify-start"
       }`}
     >
-      <div className="mt-1">
+      <div className={isCurrentUser ? "order-1" : ""}>
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={avatarUrl}
             alt={sender}
-            className="h-9 w-9 rounded-full border border-slate-300 object-cover"
+            className="msg-avatar rounded-xl object-cover"
           />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-300 text-sm font-semibold text-slate-700">
+          <div className="msg-avatar flex items-center justify-center rounded-xl text-sm font-semibold">
             {initial}
           </div>
         )}
@@ -133,29 +115,31 @@ export default function MessageBubble({
       <div
         className={`flex flex-col ${
           isCurrentUser ? "items-end" : "items-start"
-        }`}
+        } ${isCurrentUser ? "order-2" : ""}`}
       >
         <div className="relative">
           {replyTo && (
-            <div className={replyPreviewClasses}>
+            <div className="msg-reply-preview mb-2 rounded px-3 py-2 text-xs">
               <div className="font-semibold">{replyTo.sender}</div>
               <div className="truncate">{replyTo.text}</div>
             </div>
           )}
-          <div className={bubbleClasses}>
-            <div className="mb-1 flex items-center gap-2">
-              <span className="text-lg font-bold text-[#1f63c9]">{sender}</span>
+          <div
+            className={`msg-bubble max-w-[42rem] px-3.5 py-2.5 ${
+              isCurrentUser ? "msg-bubble-self" : ""
+            } ${isReplyTarget ? "msg-bubble-target" : ""}`}
+          >
+            <div className="mb-0.5 flex items-center gap-2">
+              <span className="msg-sender font-bold">{sender}</span>
               {timestamp ? (
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  {timestamp}
-                </span>
+                <span className="msg-time text-xs font-bold">{timestamp}</span>
               ) : null}
             </div>
-            <div className="text-[1.35rem] leading-snug text-slate-800">{text}</div>
+            <div className="msg-text">{text}</div>
           </div>
           {showActions && (
             <div
-              className={`absolute -top-8 flex space-x-1 rounded bg-white/90 px-2 py-1 text-xs text-gray-600 shadow transition-opacity duration-150 opacity-100 md:opacity-0 md:group-hover:opacity-100 ${
+              className={`msg-actions absolute -top-8 flex space-x-1 rounded px-2 py-1 text-xs transition-opacity duration-150 opacity-100 md:opacity-0 md:group-hover:opacity-100 ${
                 isCurrentUser ? "right-0" : "left-0"
               }`}
             >
@@ -166,7 +150,7 @@ export default function MessageBubble({
                     event.stopPropagation();
                     onReply();
                   }}
-                  className="rounded px-2 py-0.5 font-medium hover:bg-gray-100"
+                  className="rounded px-2 py-0.5 font-medium"
                 >
                   Reply
                 </button>
@@ -178,7 +162,7 @@ export default function MessageBubble({
                     event.stopPropagation();
                     onDelete();
                   }}
-                  className="rounded px-2 py-0.5 font-medium text-red-500 hover:bg-red-50"
+                  className="rounded px-2 py-0.5 font-medium text-red-300 hover:bg-red-500/20"
                 >
                   Delete
                 </button>
@@ -187,16 +171,12 @@ export default function MessageBubble({
           )}
         </div>
         {reactionOptions.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
+          <div className="msg-reactions mt-2 flex flex-wrap items-center gap-1.5">
             {reactionOptions.map((emoji) => renderReactionButton(emoji))}
           </div>
         )}
         {isCurrentUser && status && (
-          <span
-            className={`mt-1 text-xs ${
-              status === "read" ? "font-semibold text-blue-500" : "text-slate-400"
-            }`}
-          >
+          <span className="text-muted mt-1 text-xs">
             {getStatusSymbol()}
           </span>
         )}

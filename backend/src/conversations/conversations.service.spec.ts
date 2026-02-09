@@ -7,6 +7,7 @@ import {
 import { ConversationsService } from './conversations.service';
 import { ConversationNotFoundException } from '../common/exceptions/conversation-not-found.exception';
 import { NotConversationParticipantException } from '../common/exceptions/not-conversation-participant.exception';
+import { ConversationTitleService } from './conversation-title.service';
 
 const sampleParticipant = (userId: string) => ({
   userId,
@@ -28,6 +29,7 @@ describe('ConversationsService', () => {
   const otherUserId = 'user-2';
   let prisma: any;
   let usersService: any;
+  let conversationTitleService: jest.Mocked<ConversationTitleService>;
   let service: ConversationsService;
 
   beforeEach(() => {
@@ -73,8 +75,23 @@ describe('ConversationsService', () => {
     usersService = {
       findManyByIds: jest.fn(),
     };
+    prisma.message.findMany.mockResolvedValue([]);
 
-    service = new ConversationsService(prisma, usersService);
+    conversationTitleService = {
+      resolveTitle: jest.fn((title?: string | null) => {
+        if (typeof title === 'string' && title.trim().length > 0) {
+          return title.trim();
+        }
+
+        return 'Generated conversation';
+      }),
+    } as unknown as jest.Mocked<ConversationTitleService>;
+
+    service = new ConversationsService(
+      prisma,
+      usersService,
+      conversationTitleService,
+    );
   });
 
   describe('createConversation', () => {
@@ -135,6 +152,9 @@ describe('ConversationsService', () => {
           }),
         }),
       );
+      expect(conversationTitleService.resolveTitle).toHaveBeenCalledWith(
+        '  Team ',
+      );
       expect(response.isGroup).toBe(true);
       expect(
         response.participants.find((p) => p.user.id === creatorId)?.role,
@@ -172,11 +192,49 @@ describe('ConversationsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             isGroup: false,
+            title: 'Generated conversation',
           }),
         }),
       );
+      expect(conversationTitleService.resolveTitle).toHaveBeenCalledWith(
+        undefined,
+      );
       expect(response.id).toBe(conversationRecord.id);
       expect(response.participants).toHaveLength(2);
+    });
+
+    it('uses generated title when provided title is blank', async () => {
+      usersService.findManyByIds.mockResolvedValue([
+        { id: creatorId },
+        { id: otherUserId },
+      ]);
+      prisma.conversation.findFirst.mockResolvedValue(null);
+      prisma.conversation.create.mockResolvedValue({
+        id: 'conversation-2',
+        title: 'Generated conversation',
+        isGroup: false,
+        lastMessageId: null,
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+        participants: [
+          sampleParticipant(creatorId),
+          sampleParticipant(otherUserId),
+        ],
+      });
+
+      await service.createConversation(creatorId, {
+        participants: [otherUserId],
+        title: '   ',
+      });
+
+      expect(conversationTitleService.resolveTitle).toHaveBeenCalledWith('   ');
+      expect(prisma.conversation.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            title: 'Generated conversation',
+          }),
+        }),
+      );
     });
 
     it('throws a conflict when a duplicate DM exists', async () => {
@@ -211,11 +269,18 @@ describe('ConversationsService', () => {
       };
 
       prisma.conversation.findMany.mockResolvedValue([record]);
+      prisma.message.findMany.mockResolvedValue([
+        {
+          id: 'message-9',
+          content: 'Most recent message',
+        },
+      ]);
 
       const result = await service.listConversations(creatorId);
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].lastMessageId).toBe('message-9');
+      expect(result.items[0].lastMessagePreview).toBe('Most recent message');
     });
   });
 

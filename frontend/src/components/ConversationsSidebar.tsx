@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Conversation } from "@/clients/conversationsClient";
@@ -10,6 +11,10 @@ type ConversationsSidebarProps = {
   loading?: boolean;
   onLogout?: () => void;
 };
+
+function resolveSidebarTitle(conversation: Conversation): string {
+  return conversation.title || "Untitled conversation";
+}
 
 export default function ConversationsSidebar({
   conversations,
@@ -28,25 +33,26 @@ export default function ConversationsSidebar({
     }
 
     return items.filter((conversation) =>
-      (conversation.title || "Untitled conversation")
-        .toLowerCase()
-        .includes(search),
+      resolveSidebarTitle(conversation).toLowerCase().includes(search),
     );
   }, [conversations, query]);
 
   return (
-    <aside className="hidden w-72 shrink-0 flex-col border-r border-white/10 bg-gradient-to-b from-[#0f4eb8] via-[#2165ce] to-[#2f7ae4] text-white md:flex">
-      <div className="border-b border-white/15 px-5 py-4">
-        <div className="flex items-center gap-3 text-3xl">
-          <span aria-hidden="true">🛡️</span>
-          <div>
-            <div className="text-3xl font-extrabold tracking-tight">Aegis</div>
-            <div className="text-xs text-blue-100/90">Conversations</div>
-          </div>
+    <aside className="chat-sidebar hidden w-[18.25rem] shrink-0 flex-col md:flex">
+      <div className="chat-sidebar-brand px-4 py-4">
+        <div className="chat-brand-chip flex items-center gap-3.5 rounded-xl px-3 py-3">
+          <Image
+            src="/branding/aegis-logo.png"
+            alt="Aegis logo"
+            width={72}
+            height={72}
+            className="chat-brand-logo h-[4.1rem] w-[4.1rem] object-contain"
+          />
+          <span className="chat-brand-word font-bold tracking-tight">Aegis</span>
         </div>
       </div>
 
-      <div className="px-4 py-4">
+      <div className="px-3.5 pt-1">
         <label htmlFor="conversation-search" className="sr-only">
           Search conversations
         </label>
@@ -56,73 +62,74 @@ export default function ConversationsSidebar({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search..."
-          className="w-full rounded-xl border border-white/20 bg-white/90 px-3 py-2 text-sm text-slate-800 outline-none ring-0 placeholder:text-slate-500 focus:border-white"
+          className="chat-search-input w-full rounded-lg px-3 py-2 text-[1.06rem] outline-none"
         />
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 pb-3">
+      <nav className="mt-4 flex-1 overflow-y-auto px-3 py-3">
+        <div className="chat-section-title mb-2 px-2 pb-1">Channels</div>
         {loading ? (
-          <div className="space-y-2 px-2 pt-1">
-            {[1, 2, 3, 4].map((item) => (
-              <div
-                key={item}
-                className="h-11 animate-pulse rounded-xl bg-white/20"
-              />
+          <div className="space-y-2">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="chat-loading-card h-10 animate-pulse rounded-lg" />
             ))}
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-sm text-blue-50">
+          <div className="chat-list-empty rounded-lg p-3 text-sm">
             No conversations found.
           </div>
         ) : (
-          <ul className="space-y-1">
-            {filteredConversations.map((conversation) => {
-              const label = conversation.title || "Untitled conversation";
+          <ul className="space-y-4">
+            {filteredConversations.slice(0, 5).map((conversation) => {
+              const label = resolveSidebarTitle(conversation);
               const active = conversation.id === activeConversationId;
 
               return (
                 <li key={conversation.id}>
                   <Link
                     href={`/conversations/${conversation.id}`}
-                    className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition ${
-                      active
-                        ? "bg-white/20 text-white"
-                        : "text-blue-50 hover:bg-white/12"
+                    className={`chat-convo-row flex items-center justify-between gap-2 rounded-xl px-5 py-3.5 ${
+                      active ? "chat-convo-row-active" : ""
                     }`}
                   >
-                    <span className="truncate text-sm font-semibold">{label}</span>
-                    {active ? (
-                      <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                        Live
-                      </span>
-                    ) : null}
+                    <div className="min-w-0">
+                      <div className="chat-convo-row-title truncate font-medium">
+                        {label}
+                      </div>
+                      <div className="chat-convo-row-subtitle mt-1 truncate">
+                        {conversation.lastMessagePreview?.trim() || "No messages yet"}
+                      </div>
+                    </div>
                   </Link>
                 </li>
               );
             })}
           </ul>
         )}
+
+        <div className="chat-sidebar-divider my-4" />
+        <div className="chat-section-title px-2 pb-1">Projects</div>
+        <ul className="space-y-1">
+          <li className="chat-meta-row rounded-lg px-3 py-2 text-[0.95rem]">Project Alpha</li>
+        </ul>
       </nav>
 
-      <div className="border-t border-white/15 px-4 py-3">
-        <div className="mb-2 flex items-center gap-2 text-xl text-blue-100">
-          <button type="button" className="rounded-lg bg-white/10 px-2 py-1">
-            ⚙️
+      <div className="chat-sidebar-footer px-3.5 py-3">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            className="chat-settings-btn rounded-xl px-4.5 py-2.5 text-[1.12rem]"
+          >
+            Settings
           </button>
-          <button type="button" className="rounded-lg bg-white/10 px-2 py-1">
-            🔔
-          </button>
-          <button type="button" className="rounded-lg bg-white/10 px-2 py-1">
-            💬
+          <button
+            type="button"
+            onClick={onLogout}
+            className="chat-logout-btn rounded-lg px-4.5 py-2.5 text-base font-semibold"
+          >
+            Logout
           </button>
         </div>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="w-full rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-        >
-          Logout
-        </button>
       </div>
     </aside>
   );
